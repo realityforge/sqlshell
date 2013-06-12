@@ -1,0 +1,11 @@
+language: java
+jdk:
+  - openjdk6
+  - openjdk7
+  - oraclejdk7
+install:
+  - gem install bundler
+  - bundle install
+env:
+  - TEST_PG_DB_USER=postgres
+script: buildr clean package
