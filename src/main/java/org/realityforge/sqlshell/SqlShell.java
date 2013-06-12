@@ -11,24 +11,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.logging.Logger;
 
-public class SqlShell
+public final class SqlShell
 {
-  private Logger _logger;
   private Driver _driver;
   private String _database;
   private final Properties _dbProperties = new Properties();
-
-  public Logger getLogger()
-  {
-    return _logger;
-  }
-
-  public void setLogger( final Logger logger )
-  {
-    _logger = logger;
-  }
 
   public Driver getDriver()
   {
@@ -68,6 +56,21 @@ public class SqlShell
     connection.close();
 
     return results;
+  }
+
+  public int execute( final String sql )
+    throws Exception
+  {
+    final Connection connection = _driver.connect( _database, _dbProperties );
+    try
+    {
+      final Statement statement = connection.createStatement();
+      return statement.executeUpdate( sql );
+    }
+    finally
+    {
+      connection.close();
+    }
   }
 
   private List<Map<String, Object>> toList( final ResultSet resultSet )
