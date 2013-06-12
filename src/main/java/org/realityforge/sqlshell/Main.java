@@ -160,7 +160,6 @@ public class Main
     handler.setFormatter( new RawFormatter() );
     handler.setLevel( Level.ALL );
     c_logger.addHandler( handler );
-    c_shell.setLogger( c_logger );
   }
 
   private static Driver loadDatabaseDriver()
