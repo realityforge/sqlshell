@@ -8,6 +8,7 @@ define 'sqlcli' do
   compile.options.lint = 'all'
 
   compile.with :spice_cli,
+               :json,
                :jtds,
                :postgresql
 

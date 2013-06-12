@@ -7,3 +7,4 @@ artifacts:
   spice_cli: spice:spice-cli:jar:1.0
   postgresql: postgresql:postgresql:jar:9.1-901.jdbc4
   jtds: net.sourceforge.jtds:jtds:jar:1.2.7
+  json: org.json:json:jar:20090211
