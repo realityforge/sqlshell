@@ -3,8 +3,8 @@ SqlShell - JDBC based SQL Shell
 
 [![Build Status](https://secure.travis-ci.org/realityforge/sqlshell.png?branch=master)](http://travis-ci.org/realityforge/sqlshell)
 
-What is SqlShell
-----------------
+What is SqlShell ?
+------------------
 
 SqlShell is a simple shell that accepts commands from standard input and executes
 then using JDBC connection. The shell is used as the basis for automating databases.
