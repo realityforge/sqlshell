@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class SqlShell
@@ -68,41 +67,6 @@ public class SqlShell
 
     connection.close();
 
-    return results;
-  }
-
-
-  interface RowHandler
-  {
-    void handle( Map<String, Object> row );
-  }
-
-  private void each( final ResultSet resultSet, final RowHandler handler )
-    throws Exception
-  {
-    for ( final Map<String, Object> row : toList( resultSet ) )
-    {
-      handler.handle( row );
-    }
-  }
-
-  interface MapHandler<T>
-  {
-    T handle( Map<String, Object> row );
-  }
-
-  private <T> List<T> map( final ResultSet resultSet, final MapHandler<T> handler )
-    throws Exception
-  {
-    final ArrayList<T> results = new ArrayList<T>();
-    each( resultSet, new RowHandler()
-    {
-      @Override
-      public void handle( final Map<String, Object> row )
-      {
-        results.add( handler.handle( row ) );
-      }
-    } );
     return results;
   }
 
