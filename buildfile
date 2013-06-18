@@ -2,7 +2,7 @@ require 'buildr/git_auto_version'
 
 desc 'sqlshell: Command line shell to interact with a database'
 define 'sqlshell' do
-  project.group = 'org.realityforge.sqlcli'
+  project.group = 'org.realityforge.sqlshell'
   compile.options.source = '1.6'
   compile.options.target = '1.6'
   compile.options.lint = 'all'
