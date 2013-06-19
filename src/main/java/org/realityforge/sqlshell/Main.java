@@ -73,7 +73,7 @@ public class Main
 
     if ( c_logger.isLoggable( Level.FINE ) )
     {
-      c_logger.log( Level.INFO, "SqlShell starting..." );
+      c_logger.log( Level.FINE, "SqlShell starting..." );
     }
 
     final Driver driver = loadDatabaseDriver();
@@ -94,9 +94,11 @@ public class Main
       System.out.println();
       executeSQL( command );
       printPrompt();
+    if ( c_logger.isLoggable( Level.FINE ) )
+    {
+      c_logger.log( Level.FINE, "SqlShell completed." );
     }
 
-    c_logger.log( Level.INFO, "SqlShell completed." );
   }
 
   private static String readCommand()
