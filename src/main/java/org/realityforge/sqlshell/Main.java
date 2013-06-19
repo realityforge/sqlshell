@@ -113,7 +113,14 @@ public class Main
         sb.append( line );
         sb.append( "\n" );
       }
-      return sb.toString();
+      if ( 0 == sb.length() )
+      {
+        return null;
+      }
+      else
+      {
+        return sb.toString();
+      }
     }
     catch ( final IOException e )
     {
