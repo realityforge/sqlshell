@@ -17,5 +17,6 @@ define 'sqlshell' do
   package(:jar)
   package(:jar, :classifier => 'all').tap do |jar|
     jar.merge(artifact(:spice_cli))
+    jar.merge(artifact(:json))
   end
 end
