@@ -43,29 +43,59 @@ public final class SqlShell
     return _dbProperties;
   }
 
-  public List<Map<String, Object>> query( final String sql )
-    throws Exception
-  {
-    final Connection connection = getConnection();
-
-    final Statement statement = connection.createStatement();
-    final ResultSet resultSet = statement.executeQuery( sql );
-
-    final List<Map<String, Object>> results = toList( resultSet );
-
-    connection.close();
-
-    return results;
-  }
-
-  public int execute( final String sql )
+  public Result execute( final String sql )
     throws Exception
   {
     final Connection connection = getConnection();
     try
     {
       final Statement statement = connection.createStatement();
-      return statement.executeUpdate( sql );
+      final boolean returnsResultSet = statement.execute( sql );
+      if ( returnsResultSet )
+      {
+        return new Result( toList( statement.getResultSet() ), 0 );
+      }
+      else
+      {
+        return new Result( null, statement.getUpdateCount() );
+      }
+    }
+    finally
+    {
+      connection.close();
+    }
+  }
+
+  public List<Map<String, Object>> query( final String sql )
+    throws Exception
+  {
+    final Connection connection = getConnection();
+    try
+    {
+      final Statement statement = connection.createStatement();
+      final boolean returnsResultSet = statement.execute( sql );
+      if ( returnsResultSet )
+      {
+        return toList( statement.getResultSet() );
+      }
+      else
+      {
+        return new ArrayList<Map<String, Object>>();
+      }
+    }
+    finally
+    {
+      connection.close();
+    }
+  }
+
+  public int executeUpdate( final String sql )
+    throws Exception
+  {
+    final Connection connection = getConnection();
+    try
+    {
+      return connection.createStatement().executeUpdate( sql );
     }
     finally
     {

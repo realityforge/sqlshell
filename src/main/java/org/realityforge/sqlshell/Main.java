@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.realityforge.cli.CLArgsParser;
 import org.realityforge.cli.CLOption;
@@ -183,10 +184,10 @@ public class Main
     {
       c_logger.log( Level.FINE, "Executing: " + command );
     }
-    final List<Map<String, Object>> results;
+    final Result result;
     try
     {
-      results = c_shell.query( command );
+      result = c_shell.execute( command );
     }
     catch ( final Throwable t )
     {
@@ -195,14 +196,37 @@ public class Main
     }
     if ( c_logger.isLoggable( Level.FINE ) )
     {
-      c_logger.log( Level.FINE, "Result Row Count: " + results.size() );
+      if ( result.isQuery() )
+      {
+        c_logger.log( Level.FINE, "Result Row Count: " + result.getRows().size() );
+      }
+      else
+      {
+        c_logger.log( Level.FINE, "Result Update Count: " + result.getUpdateCount() );
+      }
     }
-    final JSONArray jsonArray = new JSONArray();
-    for ( Map<String, Object> row : results )
+    if ( result.isQuery() )
     {
-      jsonArray.put( new JSONObject( row ) );
+      final JSONArray jsonArray = new JSONArray();
+      for ( Map<String, Object> row : result.getRows() )
+      {
+        jsonArray.put( new JSONObject( row ) );
+      }
+      c_logger.log( Level.INFO, jsonArray.toString() );
     }
-    c_logger.log( Level.INFO, jsonArray.toString() );
+    else
+    {
+      try
+      {
+        final JSONObject jsonObject = new JSONObject();
+        jsonObject.put( "update_count", result.getUpdateCount() );
+        c_logger.log( Level.INFO, jsonObject.toString() );
+      }
+      catch ( final JSONException t )
+      {
+        c_logger.log( Level.SEVERE, "Error: Error formatting results due to " + t, t );
+      }
+    }
   }
 
   private static void setupLogger()

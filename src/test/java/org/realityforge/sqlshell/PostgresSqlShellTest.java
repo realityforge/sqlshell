@@ -34,7 +34,7 @@ public class PostgresSqlShellTest
       s( schema( schema ),
          table( schema, table, column( "ID", "integer" ), column( "TS", "timestamp NOT NULL" ) ) );
 
-    final int rowCount = shell.execute( ddl );
+    final int rowCount = shell.executeUpdate( ddl );
     assertEquals( rowCount, 0 );
 
     final List<Map<String, Object>> results =
