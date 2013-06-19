@@ -117,15 +117,18 @@ public class Main
     }
     while ( null != ( command = readCommand() ) && !command.trim().equalsIgnoreCase( "quit" ) )
     {
-      //Add new line after entered value
-      if ( isInteractive() )
+      if ( command.trim().length() > 0 )
       {
-        System.out.println();
-      }
-      executeSQL( command );
-      if ( isInteractive() )
-      {
-        printPrompt();
+        //Add new line after entered value
+        if ( isInteractive() )
+        {
+          System.out.println();
+        }
+        executeSQL( command );
+        if ( isInteractive() )
+        {
+          printPrompt();
+        }
       }
     }
 
@@ -142,23 +145,24 @@ public class Main
 
   private static String readCommand()
   {
-
     try
     {
       final StringBuilder sb = new StringBuilder();
       String line;
+      boolean readLine = false;
       while ( null != ( line = c_input.readLine() ) && !"GO".equals( line ) )
       {
+        readLine = true;
         sb.append( line );
         sb.append( "\n" );
       }
-      if ( 0 == sb.length() )
+      if ( !readLine )
       {
         return null;
       }
       else
       {
-        return sb.toString();
+        return sb.toString().trim();
       }
     }
     catch ( final IOException e )
