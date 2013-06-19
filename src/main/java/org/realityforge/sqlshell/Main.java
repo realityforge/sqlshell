@@ -8,10 +8,8 @@ import java.io.InputStreamReader;
 import java.sql.Driver;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.logging.StreamHandler;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.realityforge.cli.CLArgsParser;
@@ -210,7 +208,7 @@ public class Main
   private static void setupLogger()
   {
     c_logger.setUseParentHandlers( false );
-    final StreamHandler handler = new StreamHandler( System.out, new RawFormatter() );
+    final StdOutHandler handler = new StdOutHandler();
     handler.setLevel( Level.ALL );
     c_logger.addHandler( handler );
   }
