@@ -302,6 +302,7 @@ public class Main
     if ( c_logger.isLoggable( Level.FINE ) )
     {
       c_logger.log( Level.FINE, "Database: " + c_shell.getDatabase() );
+      c_logger.log( Level.FINE, "Database Driver: " + c_databaseDriver );
       c_logger.log( Level.FINE, "Database Properties: " + c_shell.getDbProperties() );
       if ( null != c_inputFile )
       {
