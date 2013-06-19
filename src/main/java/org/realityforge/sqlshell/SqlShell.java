@@ -47,6 +47,10 @@ public final class SqlShell
     throws Exception
   {
     final Connection connection = _driver.connect( _database, _dbProperties );
+    if( null == connection )
+    {
+      throw new IllegalStateException( "Driver does not match jdbc url" );
+    }
 
     final Statement statement = connection.createStatement();
     final ResultSet resultSet = statement.executeQuery( sql );
