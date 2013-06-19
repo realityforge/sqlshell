@@ -87,6 +87,7 @@ public class Main
 
     c_input = new BufferedReader( new InputStreamReader( System.in ) );
     String command;
+    printPrompt();
     while ( null != ( command = readCommand() ) && !command.trim().equalsIgnoreCase( "quit" ) )
     {
       //Add new line after entered value
