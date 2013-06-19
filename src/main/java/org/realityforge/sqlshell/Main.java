@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.logging.StreamHandler;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.realityforge.cli.CLArgsParser;
@@ -209,8 +210,7 @@ public class Main
   private static void setupLogger()
   {
     c_logger.setUseParentHandlers( false );
-    final ConsoleHandler handler = new ConsoleHandler();
-    handler.setFormatter( new RawFormatter() );
+    final StreamHandler handler = new StreamHandler( System.out, new RawFormatter() );
     handler.setLevel( Level.ALL );
     c_logger.addHandler( handler );
   }
