@@ -1,6 +1,8 @@
 package org.realityforge.sqlshell;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Driver;
@@ -26,6 +28,7 @@ public class Main
   private static final int VERBOSE_OPT = 'v';
   private static final int DATABASE_DRIVER_OPT = 2;
   private static final int DATABASE_PROPERTY_OPT = 'D';
+  private static final int SQL_FILE_OPT = 'f';
 
   private static final CLOptionDescriptor[] OPTIONS = new CLOptionDescriptor[]{
     new CLOptionDescriptor( "database-driver",
@@ -36,6 +39,10 @@ public class Main
                             CLOptionDescriptor.ARGUMENTS_REQUIRED_2 | CLOptionDescriptor.DUPLICATES_ALLOWED,
                             DATABASE_PROPERTY_OPT,
                             "A jdbc property." ),
+    new CLOptionDescriptor( "file",
+                            CLOptionDescriptor.ARGUMENT_REQUIRED,
+                            SQL_FILE_OPT,
+                            "A file containing sql commands." ),
     new CLOptionDescriptor( "help",
                             CLOptionDescriptor.ARGUMENT_DISALLOWED,
                             HELP_OPT,
@@ -61,6 +68,7 @@ public class Main
   private static final Logger c_logger = Logger.getAnonymousLogger();
   private static int c_commandIndex = 1;
   private static BufferedReader c_input;
+  private static String c_inputFile;
 
   public static void main( final String[] args )
   {
@@ -85,20 +93,51 @@ public class Main
 
     c_shell.setDriver( driver );
 
-    c_input = new BufferedReader( new InputStreamReader( System.in ) );
+    if ( !isInteractive() )
+    {
+      try
+      {
+        c_input = new BufferedReader( new InputStreamReader( new FileInputStream( c_inputFile ) ) );
+      }
+      catch ( FileNotFoundException e )
+      {
+        c_logger.log( Level.SEVERE, "Error: Unable to load input file " + c_inputFile + " due to: " + e, e );
+        System.exit( ERROR_OTHER_EXIT_CODE );
+        return;
+      }
+    }
+    else
+    {
+      c_input = new BufferedReader( new InputStreamReader( System.in ) );
+    }
     String command;
-    printPrompt();
+    if ( isInteractive() )
+    {
+      printPrompt();
+    }
     while ( null != ( command = readCommand() ) && !command.trim().equalsIgnoreCase( "quit" ) )
     {
       //Add new line after entered value
-      System.out.println();
+      if ( isInteractive() )
+      {
+        System.out.println();
+      }
       executeSQL( command );
-      printPrompt();
+      if ( isInteractive() )
+      {
+        printPrompt();
+      }
+    }
+
     if ( c_logger.isLoggable( Level.FINE ) )
     {
       c_logger.log( Level.FINE, "SqlShell completed." );
     }
+  }
 
+  private static boolean isInteractive()
+  {
+    return null == c_inputFile;
   }
 
   private static String readCommand()
@@ -227,6 +266,11 @@ public class Main
           c_databaseDriver = option.getArgument();
           break;
         }
+        case SQL_FILE_OPT:
+        {
+          c_inputFile = option.getArgument();
+          break;
+        }
         case VERBOSE_OPT:
         {
           c_logger.setLevel( Level.ALL );
@@ -257,8 +301,12 @@ public class Main
     }
     if ( c_logger.isLoggable( Level.FINE ) )
     {
-      c_logger.log( Level.INFO, "Database: " + c_shell.getDatabase() );
-      c_logger.log( Level.INFO, "Database Properties: " + c_shell.getDbProperties() );
+      c_logger.log( Level.FINE, "Database: " + c_shell.getDatabase() );
+      c_logger.log( Level.FINE, "Database Properties: " + c_shell.getDbProperties() );
+      if ( null != c_inputFile )
+      {
+        c_logger.log( Level.FINE, "Input File: " + c_inputFile );
+      }
     }
 
     return true;
