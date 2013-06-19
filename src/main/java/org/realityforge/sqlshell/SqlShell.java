@@ -46,11 +46,7 @@ public final class SqlShell
   public List<Map<String, Object>> query( final String sql )
     throws Exception
   {
-    final Connection connection = _driver.connect( _database, _dbProperties );
-    if( null == connection )
-    {
-      throw new IllegalStateException( "Driver does not match jdbc url" );
-    }
+    final Connection connection = getConnection();
 
     final Statement statement = connection.createStatement();
     final ResultSet resultSet = statement.executeQuery( sql );
@@ -65,7 +61,7 @@ public final class SqlShell
   public int execute( final String sql )
     throws Exception
   {
-    final Connection connection = _driver.connect( _database, _dbProperties );
+    final Connection connection = getConnection();
     try
     {
       final Statement statement = connection.createStatement();
@@ -94,5 +90,16 @@ public final class SqlShell
     }
 
     return list;
+  }
+
+  private Connection getConnection()
+    throws SQLException
+  {
+    final Connection connection = _driver.connect( _database, _dbProperties );
+    if( null == connection )
+    {
+      throw new IllegalStateException( "Driver does not match jdbc url" );
+    }
+    return connection;
   }
 }
