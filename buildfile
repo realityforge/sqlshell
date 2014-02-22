@@ -10,12 +10,18 @@ define 'sqlshell' do
   compile.options.target = '1.6'
   compile.options.lint = 'all'
 
+  pom.add_apache2_license
+  pom.add_github_project('realityforge/sqlshell')
+  pom.add_developer('realityforge', 'Peter Donald', 'peter@realityforge.org', ['Developer'])
+
   compile.with COMPILE_DEPS
 
   test.using :testng
   test.with TEST_DEPS
 
   package(:jar)
+  package(:sources)
+  package(:javadoc)
   package(:jar, :classifier => 'all').tap do |jar|
     jar.merge(artifact(:spice_cli))
     jar.merge(artifact(:json))
