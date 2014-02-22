@@ -1,6 +1,6 @@
 require 'buildr/git_auto_version'
 
-COMPILE_DEPS = [:spice_cli, :json]
+COMPILE_DEPS = [:getopt4j, :json]
 TEST_DEPS = [:jtds, :postgresql]
 
 desc 'sqlshell: Command line shell to interact with a database'
@@ -23,7 +23,7 @@ define 'sqlshell' do
   package(:sources)
   package(:javadoc)
   package(:jar, :classifier => 'all').tap do |jar|
-    jar.merge(artifact(:spice_cli))
+    jar.merge(artifact(:getopt4j))
     jar.merge(artifact(:json))
   end
 end

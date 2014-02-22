@@ -13,10 +13,10 @@ import java.util.logging.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.realityforge.cli.CLArgsParser;
-import org.realityforge.cli.CLOption;
-import org.realityforge.cli.CLOptionDescriptor;
-import org.realityforge.cli.CLUtil;
+import org.realityforge.getopt4j.CLArgsParser;
+import org.realityforge.getopt4j.CLOption;
+import org.realityforge.getopt4j.CLOptionDescriptor;
+import org.realityforge.getopt4j.CLUtil;
 
 /**
  * The entry point in which to run the tool.
