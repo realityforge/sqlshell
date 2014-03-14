@@ -1,0 +1,80 @@
+/* DO NOT EDIT: File is auto-generated */
+package <%= repository.gwt_rpc.client_ioc_package %>;
+
+<%= description_javadoc_for(repository, "") %>@javax.annotation.Generated( "Domgen" )
+@SuppressWarnings( { "UnusedDeclaration", "JavaDoc" } )
+public class <%= repository.gwt_rpc.rpc_services_module_name %>
+  extends com.google.gwt.inject.client.AbstractGinModule
+{
+<%
+  needs_xsrf =
+    repository.data_modules.select{|data_module| data_module.gwt_rpc?}.any? do |data_module|
+      data_module.services.select{|service| service.gwt_rpc?}.any? do |service|
+        service.gwt_rpc.xsrf_protected?
+      end
+    end
+  if needs_xsrf
+%>
+  private static com.google.gwt.user.client.rpc.XsrfToken c_xsrfToken;
+
+  public static com.google.gwt.user.client.rpc.XsrfToken getXsrfToken()
+  {
+    if( null == c_xsrfToken )
+    {
+      throw new IllegalStateException( "Attempting to construct service requiring XsrfToken without specifying token." );
+    }
+    return c_xsrfToken;
+  }
+<%
+  end
+%>
+  public static void initialize( final String moduleName<% if needs_xsrf %>, final com.google.gwt.user.client.rpc.XsrfToken xsrfToken<% end -%> )
+  {
+<%
+  if needs_xsrf
+-%>
+    if( null != c_xsrfToken )
+    {
+      throw new IllegalStateException( "Attempting to re-initialialize gin module." );
+    }
+    c_xsrfToken = xsrfToken;
+<%
+  end
+-%>
+    if( !moduleName.equals( "<%= repository.gwt_rpc.module_name %>" ) )
+    {
+      throw new IllegalStateException( "Actual GWT module name '" + com.google.gwt.core.client.GWT.getModuleName() + "' does not match module name '<%= repository.gwt_rpc.module_name %>' used during compilation." );
+    }
+  }
+
+  @Override
+  protected void configure()
+  {<%
+  repository.data_modules.select{|data_module| data_module.gwt_rpc?}.each do |data_module|
+    data_module.services.select{|service| service.gwt_rpc?}.each do |service|
+%>
+    bind( <%= service.gwt_rpc.qualified_facade_service_name %>.class ).to( <%= service.gwt_rpc.qualified_proxy_name %>.class );
+<%
+    end
+  end
+%>  }
+<%
+  repository.data_modules.select{|data_module| data_module.gwt_rpc?}.each do |data_module|
+    data_module.services.select{|service| service.gwt_rpc?}.each do |service|
+%>
+  @com.google.inject.Provides
+  @javax.inject.Singleton
+  public <%= service.gwt_rpc.qualified_async_rpc_service_name %> get<%= service.name %>()
+  {
+    final <%= service.gwt_rpc.qualified_async_rpc_service_name %> service = com.google.gwt.core.client.GWT.create( <%= service.gwt_rpc.qualified_service_name %>.class );
+<% if service.gwt_rpc.xsrf_protected? %>
+    ( (com.google.gwt.user.client.rpc.HasRpcToken) service ).setRpcToken( getXsrfToken() );
+<% end %>
+    ( (com.google.gwt.user.client.rpc.ServiceDefTarget) service ).setRpcRequestBuilder( <%= repository.gwt_rpc.qualified_request_builder_name %>.INSTANCE );
+    ( (com.google.gwt.user.client.rpc.ServiceDefTarget) service ).setServiceEntryPoint( com.google.gwt.core.client.GWT.getHostPageBaseURL() + "<%= repository.gwt_rpc.module_name %>/" + <%= service.gwt_rpc.qualified_service_name %>.PATH );
+    return service;
+  }
+<%
+    end
+  end
+%>}

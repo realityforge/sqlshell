@@ -1,0 +1,41 @@
+/* DO NOT EDIT: File is auto-generated */
+package <%= enumeration.data_module.ee.data_type_package %>;
+
+<%= description_javadoc_for(enumeration, "") %>@javax.annotation.Generated( "Domgen" )
+@SuppressWarnings( { "UnusedDeclaration", "JavaDoc" } )
+<% if enumeration.jaxb?
+%>@javax.xml.bind.annotation.XmlType( name = "<%= enumeration.name %>Type"<%= namespace_annotation_parameter(enumeration.xml) %> )
+@javax.xml.bind.annotation.XmlEnum( java.lang.String.class )<% end %>
+public enum <%= enumeration.ee.name %>
+  implements java.io.Serializable
+{
+  <%= enumeration.values.collect {|k| "#{k}" } .join(",\n  ") %>;
+
+<% if enumeration.jackson? && enumeration.numeric_values? -%>
+  @org.codehaus.jackson.annotate.JsonValue
+  public int value()
+  {
+    return super.ordinal();
+  }
+
+  public static class Deserializer
+    extends org.codehaus.jackson.map.JsonDeserializer<<%= enumeration.ee.name %>>
+  {
+    @Override
+    public <%= enumeration.ee.name %> deserialize( final org.codehaus.jackson.JsonParser parser, final org.codehaus.jackson.map.DeserializationContext context )
+      throws java.io.IOException
+    {
+      final int typeCode = parser.getValueAsInt();
+      for( final <%= enumeration.ee.name %> c: <%= enumeration.ee.name %>.values() )
+      {
+        if( c.ordinal() == typeCode )
+        {
+          return c;
+        }
+      }
+      throw new java.io.IOException( "Invalid <%= enumeration.ee.name %> type code: " + typeCode );
+    }
+  }
+
+<% end -%>
+}

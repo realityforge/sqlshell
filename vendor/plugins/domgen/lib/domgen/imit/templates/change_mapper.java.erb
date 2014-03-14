@@ -1,0 +1,41 @@
+/* DO NOT EDIT: File is auto-generated */
+package <%= repository.imit.entity_package %>;
+
+/**
+ * Utility class that applies the changes to the entities defined by the "<%= repository.name %>" repository.
+ */
+@javax.annotation.Generated( "Domgen" )
+@SuppressWarnings( { "UnusedDeclaration", "JavaDoc" } )
+public final class <%= repository.imit.change_mapper_name %>
+  implements org.realityforge.replicant.client.ChangeMapper
+{
+<% repository.data_modules.select{|data_module| data_module.imit? }.each do |data_module|
+%>  private final <%= data_module.imit.qualified_mapper_name %> _<%= data_module.name %>;
+<% end %>
+  @javax.inject.Inject
+  public <%= repository.imit.change_mapper_name%>( <%= repository.data_modules.select{|data_module| data_module.imit? }.collect { |data_module| "final #{data_module.imit.qualified_mapper_name} #{data_module.name}" }.join(", ") %>
+)
+  {
+<% repository.data_modules.select{|data_module| data_module.imit? }.each do |data_module|
+%>    _<%= data_module.name %> = <%= data_module.name %>;
+<% end %>
+  }
+
+  public Object applyChange( final org.realityforge.replicant.client.Change change )
+  {
+    switch( change.getTypeID() )
+    {
+<%
+repository.data_modules.select { |data_module| data_module.imit? }.each do |data_module|
+  data_module.entities.each do |entity|
+    if entity.imit? && !entity.abstract?
+%>      case <%= entity.imit.qualified_name %>.TRANSPORT_ID: return _<%= entity.data_module.name %>.applyChangeTo<%= entity.name %>( change );
+<%
+    end
+  end
+end
+%>
+      default: throw new IllegalArgumentException( "Unknown typeID = " + change.getTypeID() );
+    }
+  }
+}
