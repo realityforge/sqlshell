@@ -2,10 +2,15 @@ package org.realityforge.sqlshell.dbconfig;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.xml.crypto.Data;
 import org.realityforge.sqlshell.SqlShell;
+import org.realityforge.sqlshell.data_type.mssql.Database;
+import org.realityforge.sqlshell.data_type.mssql.Login;
 
 public final class DbConfig
 {
+  private final List<Database> _databases;
+  private boolean _cleanupDatabases;
   private final List<Login> _logins;
   private boolean _cleanupLogins;
   private final SqlShell _shell;
@@ -14,12 +19,23 @@ public final class DbConfig
   {
     _shell = shell;
     _cleanupLogins = false;
-    _logins = new ArrayList<Login>();
+    _logins = new ArrayList<>();
+    _databases = new ArrayList<>();
   }
 
   public void setCleanupLogins( final boolean cleanupLogins )
   {
     _cleanupLogins = cleanupLogins;
+  }
+
+  public void setCleanupDatabases( final boolean cleanupDatabases )
+  {
+    _cleanupDatabases = cleanupDatabases;
+  }
+
+  public void addDatabase( final Database d )
+  {
+    _databases.add( d );
   }
 
   public void addLogin( final Login l )
@@ -30,17 +46,19 @@ public final class DbConfig
   public void apply()
     throws Exception
   {
+    // Create all required databases
+
     // Create all required logins
     for ( final Login login : _logins )
     {
       // Check if login exists, if not create
       if ( loginExists( login.getName() ) )
       {
-        createLogin( login );
+        updateLogin( login );
       }
       else
       {
-        updateLogin( login );
+        createLogin( login );
       }
     }
 
@@ -76,32 +94,23 @@ public final class DbConfig
   private void createLogin( final Login login )
     throws Exception
   {
-    assert ( 0 == _shell.executeUpdate( join( null, "CREATE LOGIN [", login.getName(),
-                                              "]" ) ) );
-/*
-    from = ""
-    options = []
-    if new_resource.password
-      options << "PASSWORD=N'#{new_resource.password}'"
-    end
-    options << "DEFAULT_DATABASE=[#{new_resource.default_database}]"
-    options << "DEFAULT_LANGUAGE=[#{new_resource.default_language}]"
-    if new_resource.password
-      options << "CHECK_EXPIRATION=OFF"
-      options << "CHECK_POLICY=OFF"
-      types = ['SQL_LOGIN']
+    String options = join(", ",
+                          "DEFAULT_DATABASE=[" + (login.getDefaultDatabase() == null ? "master" : login.getDefaultDatabase()) + "]",
+                          "DEFAULT_LANGUAGE=[" + (login.getDefaultLanguage() == null ? "us_english" : login.getDefaultLanguage()) + "]");
+    String from = "";
+    if ( null != login.getPassword() )
+    {
+      options = join(", ",
+                     options,
+                     "PASSWORD = N'" + login.getPassword() + "'",
+                     "CHECK_EXPIRATION=OFF",
+                     "CHECK_POLICY=OFF" );
+    }
     else
-      types = ['WINDOWS_GROUP','WINDOWS_LOGIN']
-      from = 'FROM WINDOWS'
-    end
-
-    sqlshell_exec "CREATE LOGIN [#{new_resource.login}]" do
-      jdbc_url new_resource.jdbc_url
-      jdbc_driver new_resource.jdbc_driver
-      extra_classpath new_resource.extra_classpath
-      jdbc_properties new_resource.jdbc_properties
-      command "CREATE LOGIN [#{new_resource.login}] #{from} WITH #{options.join(', ')}"
-*/
+    {
+      from = "FROM WINDOWS";
+    }
+    assert ( 0 == _shell.executeUpdate( "CREATE LOGIN [" + login.getName() + "] " + from + " WITH " + options ) );
   }
 
   private boolean loginExists( final String name )

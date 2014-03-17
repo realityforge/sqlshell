@@ -14,6 +14,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 public class MssqlSqlShellTest
+  extends AbstractMssqlTest
 {
   private static final String DB1_NAME = "sqlshell_test_db";
 
@@ -25,7 +26,7 @@ public class MssqlSqlShellTest
     final Driver driver = getDriver();
     shell.setDriver( driver );
     assertEquals( shell.getDriver(), driver );
-    final String database = getDatabase();
+    final String database = getDbURL( DB1_NAME );
     shell.setDatabase( database );
     assertEquals( shell.getDatabase(), database );
     copyDbPropertiesToShell( shell );
@@ -45,17 +46,6 @@ public class MssqlSqlShellTest
     assertEquals( results.size(), 1 );
     assertEquals( results.get( 0 ).get( "table_schema" ), schema );
     assertEquals( results.get( 0 ).get( "table_name" ), table );
-  }
-
-  private void copyDbPropertiesToShell( final SqlShell shell )
-  {
-    Properties props = getDbProperties();
-    Enumeration e = props.propertyNames();
-    while ( e.hasMoreElements() )
-    {
-      String key = (String) e.nextElement();
-      shell.getDbProperties().setProperty( key, props.getProperty( key ) );
-    }
   }
 
   protected final String schema( final String schema )
@@ -89,55 +79,12 @@ public class MssqlSqlShellTest
     return sb.toString();
   }
 
-  protected final Properties getDbProperties()
-  {
-    final Properties properties = new Properties();
-    final String username = System.getenv( "TEST_MSSQL_DB_USER" );
-    if ( null != username )
-    {
-      properties.setProperty( "user", username );
-    }
-    final String password = System.getenv( "TEST_MSSQL_DB_PASSWORD" );
-    if ( null != password )
-    {
-      properties.setProperty( "password", password );
-    }
-    return properties;
-  }
-
-  protected final Driver getDriver()
-  {
-    return new Driver();
-  }
-
-  protected final String getDatabase()
-  {
-    return getDbURL( DB1_NAME );
-  }
-
-  protected final String getControlDatabase()
-  {
-    return getDbURL( "master" );
-  }
-
-  private String getDbURL( final String dbName )
-  {
-    final String host = System.getProperty( "test.mssql.host", "127.0.0.1" );
-    final String port = System.getProperty( "test.mssql.port", null );
-    final String instance = System.getProperty( "test.mssql.instance", null );
-    return "jdbc:jtds:sqlserver://" +
-           host +
-           ( port == null ? "" : ":" + port ) +
-           "/" + dbName +
-           ( instance == null ? "" : ";instance=" + instance );
-  }
-
   @BeforeMethod
   public final void setupDatabases()
     throws Exception
   {
     tearDownDatabases();
-    executeSQL( "CREATE DATABASE " + DB1_NAME, getControlDatabase() );
+    executeSQL( "CREATE DATABASE " + DB1_NAME, getControlDbUrl() );
   }
 
   @AfterMethod
@@ -146,7 +93,7 @@ public class MssqlSqlShellTest
   {
     executeSQL(
       "IF EXISTS ( SELECT * FROM sys.master_files WHERE state = 0 AND db_name(database_id) = '" + DB1_NAME + "') " +
-      " DROP DATABASE " + DB1_NAME, getControlDatabase() );
+      " DROP DATABASE " + DB1_NAME, getControlDbUrl() );
   }
 
   protected final void executeSQL( final String sql, final String database )
