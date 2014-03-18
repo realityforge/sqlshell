@@ -36,22 +36,22 @@ public final class Runner
     }
 
     // Remove any unwanted ones
-    final List<Login> existingLogins = getLogins();
-
-    for ( final Login existingLogin : existingLogins )
+    if ( config.isRemoveUnwantedLogins() )
     {
-      if ( !config.getLogins().contains( existingLogin ) )
+      for ( final Login existingLogin : getLogins() )
       {
-        if ( config.isRemoveUnwantedLogins() )
+        if ( !config.getLogins().contains( existingLogin ) )
         {
           removeLogin( existingLogin );
         }
-        else
-        {
-          log( "Existing login ", existingLogin.getName(), " is not in configuration" );
-        }
       }
     }
+  }
+
+  private List<Login> getLogins()
+  {
+    // TODO: Implement to obtain logins from server
+    return new ArrayList<>(  );
   }
 
   public boolean loginExists( final Login login )
