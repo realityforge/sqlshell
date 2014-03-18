@@ -128,6 +128,16 @@ public final class Runner
     return options;
   }
 
+  public boolean databaseExists( final Database db )
+  {
+    return false;
+  }
+
+  public void dropDatabase( final Database db )
+  {
+    throw new UnsupportedOperationException( "dropDatabase" );
+  }
+
   private void log( final String... s )
   {
     System.out.println( join( null, s ) );
@@ -145,20 +155,5 @@ public final class Runner
       sb.append( command );
     }
     return sb.toString();
-  }
-
-  public List<Login> getLogins()
-  {
-    return new ArrayList<Login>();
-  }
-
-  public boolean databaseExists( final Database db )
-  {
-    return false;
-  }
-
-  public void dropDatabase( final Database db )
-  {
-    throw new UnsupportedOperationException( "dropDatabase" );
   }
 }
