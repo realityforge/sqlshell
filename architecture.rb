@@ -26,7 +26,7 @@ TEXT
 A User is an account within a Database that allows a Login to access artifacts within the database
 TEXT
       t.string(:Name, 50)
-      t.struct(:Login, :Login)
+      t.string(:Login, 50)
     end
 
     data_module.struct(:Database) do |t|
@@ -36,6 +36,17 @@ TEXT
       t.string(:Name, 50)
 
       t.struct(:User, :User, :collection_type => :sequence)
+    end
+
+    data_module.struct(:ServerConfig) do |t|
+      t.description(<<TEXT)
+The ServerConfig is the primary container which defines all the entire desired state of the database server
+TEXT
+      t.boolean(:RemoveUnwantedLogins)
+      t.struct(:Login, :Login, :collection_type => :sequence)
+
+      t.boolean(:RemoveUnwantedDatabases)
+      t.struct(:Database, :Database, :collection_type => :sequence)
     end
   end
 end
