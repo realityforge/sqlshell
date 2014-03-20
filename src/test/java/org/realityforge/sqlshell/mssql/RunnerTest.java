@@ -11,6 +11,8 @@ import org.realityforge.sqlshell.data_type.mssql.User;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -74,6 +76,67 @@ public class RunnerTest
 
     _runner.removeLogin( login );
     assertFalse( _runner.loginExists( login ) );
+  }
+
+  @Test
+  public void getLogins()
+    throws Exception
+  {
+    final Login login1 = new Login( "login1", "pwd", null, null );
+    final Login login2 = new Login( "login2", "pwd", null, null );
+    final ArrayList<Login> logins = new ArrayList<Login>();
+    logins.add( login1 );
+    logins.add( login2 );
+    _runner.apply( new ServerConfig( false, logins, false, new ArrayList<Database>() ) );
+
+    assertTrue( _runner.loginExists( login1 ) );
+    assertTrue( _runner.loginExists( login2 ) );
+
+    final List<Login> existingLogins = _runner.getLogins();
+    boolean found1 = false, found2 = false;
+    for ( final Login existingLogin : existingLogins )
+    {
+      if ( existingLogin.getName().equals( login1.getName() ))
+        found1 = true;
+      if ( existingLogin.getName().equals( login2.getName() ))
+        found2 = true;
+    }
+    assertTrue(found1);
+    assertTrue(found2);
+    _runner.removeLogin( login1 );
+    _runner.removeLogin( login2 );
+  }
+
+  @Test
+  public void cleanupLogins()
+    throws Exception
+  {
+    final Login login1 = new Login( "login1", "pwd", null, null );
+    if ( _runner.loginExists( login1 ) )
+    {
+      _runner.removeLogin( login1 );
+    }
+    final Login login2 = new Login( "login2", "pwd", null, null );
+    if ( !_runner.loginExists( login2 ) )
+    {
+      _runner.createLogin( login2 );
+    }
+
+    final ArrayList<Login> existingLogins = new ArrayList<Login>();
+    existingLogins.add( login1 );
+    existingLogins.add( login2 );
+    final Runner spyRunner = spy( _runner );
+    when( spyRunner.getLogins() ).thenReturn( existingLogins );
+
+    final ArrayList<Login> logins = new ArrayList<Login>();
+    logins.add( login1 );
+
+    spyRunner.apply( new ServerConfig( true, logins, false, new ArrayList<Database>() ) );
+
+    assertTrue( _runner.loginExists( login1 ) );
+    assertFalse( _runner.loginExists( login2 ));
+
+    _runner.removeLogin( login1 );
   }
 
   @Test

@@ -1,7 +1,7 @@
 require 'buildr/git_auto_version'
 
 COMPILE_DEPS = [:getopt4j, :json, :javax_jsr305]
-TEST_DEPS = [:jtds, :postgresql]
+TEST_DEPS = [:jtds, :postgresql, :mockito]
 
 desc 'sqlshell: Command line shell to interact with a database'
 define 'sqlshell' do

@@ -2,12 +2,13 @@ package org.realityforge.sqlshell.mssql;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.realityforge.sqlshell.SqlShell;
 import org.realityforge.sqlshell.data_type.mssql.Database;
 import org.realityforge.sqlshell.data_type.mssql.Login;
 import org.realityforge.sqlshell.data_type.mssql.ServerConfig;
 
-public final class Runner
+public class Runner
 {
   private final SqlShell _shell;
 
@@ -48,10 +49,29 @@ public final class Runner
     }
   }
 
-  private List<Login> getLogins()
+  protected List<Login> getLogins()
+    throws Exception
   {
     // TODO: Implement to obtain logins from server
-    return new ArrayList<>(  );
+    final List<Map<String,Object>> loginRows = _shell.query(
+      "SELECT SP.name as name " +
+      "FROM " +
+      "  sys.syslogins L " +
+      "JOIN sys.server_principals SP ON SP.sid = L.sid " +
+      "WHERE " +
+      "  SP.type_desc IN ('SQL_LOGIN', 'WINDOWS_GROUP', 'WINDOWS_LOGIN') AND " +
+      "  SP.is_disabled = 0 AND " +
+      "  SP.name NOT LIKE 'NT AUTHORITY\\%' AND " +
+      "  SP.name NOT LIKE 'NT SERVICE\\%'"
+    );
+
+    final ArrayList<Login> logins = new ArrayList<>();
+
+    for ( final Map<String, Object> loginRow : loginRows )
+    {
+      logins.add( new Login( (String) loginRow.get( "name" ), null, null, null));
+    }
+    return logins;
   }
 
   public boolean loginExists( final Login login )
