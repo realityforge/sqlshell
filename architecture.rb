@@ -1,5 +1,6 @@
 Domgen.repository(:sqlshell) do |repository|
   repository.enable_facet(:ee)
+  repository.enable_facet(:jackson)
   repository.java.base_package = 'org.realityforge.sqlshell'
 
   repository.data_module(:MsSQL) do |data_module|
