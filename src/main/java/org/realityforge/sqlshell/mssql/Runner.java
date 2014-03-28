@@ -41,7 +41,16 @@ public class Runner
     {
       for ( final Login existingLogin : getLogins() )
       {
-        if ( !config.getLogins().contains( existingLogin ) )
+        boolean keep = false;
+        for ( final Login login : config.getLogins() )
+        {
+          if ( login.getName().equals( existingLogin.getName() ))
+          {
+            keep = true;
+            break;
+          }
+        }
+        if ( !keep )
         {
           removeLogin( existingLogin );
         }

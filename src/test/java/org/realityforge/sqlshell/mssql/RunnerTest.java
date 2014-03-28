@@ -111,6 +111,8 @@ public class RunnerTest
     final Login login1 = login( "login1", "pwd" );
     final Login login2 = login( "login2", "pwd" );
     cleanup( login1, login2 );
+    _runner.createLogin( login1 );
+    _runner.createLogin( login2 );
 
     final ArrayList<Login> existingLogins = new ArrayList<Login>();
     existingLogins.add( login1 );
@@ -118,7 +120,10 @@ public class RunnerTest
     final Runner spyRunner = spy( _runner );
     when( spyRunner.getLogins() ).thenReturn( existingLogins );
 
-    spyRunner.apply( serverConfig( jLogins( jLogin( login1 ) ) ) );
+    assertTrue( _runner.loginExists( login1 ) );
+    assertTrue( _runner.loginExists( login2 ) );
+
+    spyRunner.apply( serverConfig( jLogins( jLogin( login1 ) ), true ) );
 
     assertTrue( _runner.loginExists( login1 ) );
     assertFalse( _runner.loginExists( login2 ) );
@@ -190,7 +195,13 @@ public class RunnerTest
   private ServerConfig serverConfig( final String logins )
     throws IOException
   {
-    return ( new ObjectMapper() ).readValue( jServerConfig( logins ), ServerConfig.class );
+    return ( new ObjectMapper() ).readValue( jServerConfig( logins, null ), ServerConfig.class );
+  }
+
+  private ServerConfig serverConfig( final String logins, final boolean cleanupLogins )
+    throws IOException
+  {
+    return ( new ObjectMapper() ).readValue( jServerConfig( logins, cleanupLogins ), ServerConfig.class );
   }
 
   private Login login( final String name, final String password )
@@ -199,10 +210,21 @@ public class RunnerTest
     return _objectMapper.readValue( jLogin( name, password ), Login.class );
   }
 
-  private String jServerConfig( final String logins )
+  private String jServerConfig( final String logins, final Boolean cleanupLogins )
     throws IOException
   {
-    return e( aV( "logins", logins ) );
+    final List <String>attributes = new ArrayList<>();
+    if ( null != logins )
+    {
+      attributes.add( aV( "logins", logins ) );
+    }
+
+    if ( null != cleanupLogins )
+    {
+       attributes.add( a("remove_unwanted_logins", cleanupLogins.toString() ) );
+    }
+
+    return e( attributes.toArray(new String[attributes.size()]) );
   }
 
   private String jLogins( final String ... logins )
