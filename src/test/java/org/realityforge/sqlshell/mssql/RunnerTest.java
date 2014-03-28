@@ -236,9 +236,8 @@ public class RunnerTest
   {
     try
     {
-      final
-      List<Map<String, Object>>
-        results = _shell.query( "SELECT DATABASEPROPERTYEX('" + db.getName() + "', 'Collation') SQLCollation" );
+      final List<Map<String, Object>> results =
+        _shell.query( "SELECT DATABASEPROPERTYEX('" + db.getName() + "', 'Collation') SQLCollation" );
       assertEquals( 1, results.size() );
       assertEquals( collation, results.get( 0 ).get( "SQLCollation" ) );
     }
@@ -253,11 +252,8 @@ public class RunnerTest
   {
     try
     {
-      final
-      List<Map<String, Object>>
-        results = _shell.query( "SELECT name, recovery_model_desc " +
-                                "      FROM sys.databases " +
-                                "      WHERE name = '" + db.getName() + "'" );
+      final List<Map<String, Object>> results =
+        _shell.query( "SELECT name, recovery_model_desc FROM sys.databases WHERE name = '" + db.getName() + "'" );
       assertEquals( 1, results.size() );
       assertEquals( model, results.get( 0 ).get( "recovery_model_desc" ) );
     }
@@ -271,7 +267,6 @@ public class RunnerTest
   private ServerConfig sc( final String... attributes )
     throws IOException
   {
-    System.out.println(jSC( attributes ));
     return ( new ObjectMapper() ).readValue( jSC( attributes ), ServerConfig.class );
   }
 
