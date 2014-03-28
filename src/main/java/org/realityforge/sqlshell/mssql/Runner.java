@@ -69,7 +69,6 @@ public class Runner
   protected List<Login> getLogins()
     throws Exception
   {
-    // TODO: Implement to obtain logins from server
     final List<Map<String, Object>> loginRows = _shell.query(
       "SELECT SP.name as name " +
       "FROM " +
