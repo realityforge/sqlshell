@@ -175,7 +175,8 @@ public class Runner
     throws Exception
   {
     log( "Creating database ", db.getName() );
-    _shell.executeUpdate( "CREATE DATABASE [" + db.getName() + "] " + ( null != db.getCollation() ? "COLLATE " + db.getCollation() : "" ));
+    _shell.executeUpdate(
+      "CREATE DATABASE [" + db.getName() + "] " + ( null != db.getCollation() ? "COLLATE " + db.getCollation() : "" ) );
   }
 
   private void alterDatabase( final Database db )
@@ -184,9 +185,13 @@ public class Runner
     // Update Collation model if needed
     if ( null != db.getCollation() )
     {
-      if ( 0 == _shell.query( "SELECT name FROM sys.databases WHERE name = '" + db.getName() + "' and collation_name = '" + db.getCollation() + "'" ).size())
+      if ( 0 == _shell.query( "SELECT name FROM sys.databases WHERE name = '" +
+                              db.getName() +
+                              "' and collation_name = '" +
+                              db.getCollation() +
+                              "'" ).size() )
       {
-        log( "Update database ", db.getName() + " collation to " + db.getCollation() );
+        log( "Updating database ", db.getName() + " collation to " + db.getCollation() );
         _shell.executeUpdate( "ALTER DATABASE [" + db.getName() + "] COLLATE " + db.getCollation() );
       }
     }
@@ -194,10 +199,15 @@ public class Runner
     // Update Recovery model if needed
     if ( null != db.getRecoveryModel() )
     {
-      if ( 0 == _shell.query( "SELECT name FROM sys.databases WHERE name = '" + db.getName() + "' and recovery_model_desc = '" + db.getRecoveryModel() + "'" ).size())
+      if ( 0 == _shell.query( "SELECT name FROM sys.databases WHERE name = '" +
+                              db.getName() +
+                              "' and recovery_model_desc = '" +
+                              db.getRecoveryModel() +
+                              "'" ).size() )
       {
-        log( "Update database ", db.getName() + " recovery model to " + db.getRecoveryModel() );
-        _shell.executeUpdate( "ALTER DATABASE [" + db.getName() + "] SET RECOVERY " + db.getRecoveryModel() + " WITH NO_WAIT" );
+        log( "Updating database ", db.getName() + " recovery model to " + db.getRecoveryModel() );
+        _shell.executeUpdate(
+          "ALTER DATABASE [" + db.getName() + "] SET RECOVERY " + db.getRecoveryModel() + " WITH NO_WAIT" );
       }
     }
   }
