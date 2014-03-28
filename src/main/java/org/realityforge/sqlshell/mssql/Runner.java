@@ -21,6 +21,14 @@ public class Runner
     throws Exception
   {
     // Create all required databases
+    for ( final Database db : config.getDatabases() )
+    {
+      if ( !databaseExists( db ) )
+      {
+        createDatabase( db );
+      }
+      alterDatabase( db );
+    }
 
     // Create all required logins
     for ( final Login login : config.getLogins() )
@@ -44,7 +52,7 @@ public class Runner
         boolean keep = false;
         for ( final Login login : config.getLogins() )
         {
-          if ( login.getName().equals( existingLogin.getName() ))
+          if ( login.getName().equals( existingLogin.getName() ) )
           {
             keep = true;
             break;
@@ -62,7 +70,7 @@ public class Runner
     throws Exception
   {
     // TODO: Implement to obtain logins from server
-    final List<Map<String,Object>> loginRows = _shell.query(
+    final List<Map<String, Object>> loginRows = _shell.query(
       "SELECT SP.name as name " +
       "FROM " +
       "  sys.syslogins L " +
@@ -78,7 +86,7 @@ public class Runner
 
     for ( final Map<String, Object> loginRow : loginRows )
     {
-      logins.add( new Login( (String) loginRow.get( "name" ), null, null, null));
+      logins.add( new Login( (String) loginRow.get( "name" ), null, null, null ) );
     }
     return logins;
   }
@@ -103,7 +111,7 @@ public class Runner
   public void removeLogin( final Login login )
     throws Exception
   {
-    log("Removing login ", login.getName() );
+    log( "Removing login ", login.getName() );
 
     _shell.executeUpdate( "DROP LOGIN [" + login.getName() + "]" );
   }
@@ -111,7 +119,7 @@ public class Runner
   public void updateLogin( final Login login )
     throws Exception
   {
-    log("Updating login ", login.getName() );
+    log( "Updating login ", login.getName() );
     _shell.executeUpdate( "ALTER LOGIN [" + login.getName() + "] WITH " + loginOptions( login ) );
   }
 
@@ -128,7 +136,7 @@ public class Runner
       from = "";
     }
 
-    log("Creating login ", login.getName() );
+    log( "Creating login ", login.getName() );
 
     _shell.executeUpdate( "CREATE LOGIN [" + login.getName() + "] " + from + " WITH " + loginOptions( login ) );
   }
@@ -158,13 +166,49 @@ public class Runner
   }
 
   public boolean databaseExists( final Database db )
+    throws Exception
   {
-    return false;
+    return !_shell.query( "SELECT * FROM sys.databases WHERE name = '" + db.getName() + "'" ).isEmpty();
   }
 
-  public void dropDatabase( final Database db )
+  private void createDatabase( final Database db )
+    throws Exception
   {
-    throw new UnsupportedOperationException( "dropDatabase" );
+    log( "Creating database ", db.getName() );
+    _shell.executeUpdate( "CREATE DATABASE [" + db.getName() + "] " + ( null != db.getCollation() ? "COLLATE " + db.getCollation() : "" ));
+  }
+
+  private void alterDatabase( final Database db )
+    throws Exception
+  {
+    // Update Collation model if needed
+    if ( null != db.getCollation() )
+    {
+      if ( 0 == _shell.query( "SELECT name FROM sys.databases WHERE name = '" + db.getName() + "' and collation_name = '" + db.getCollation() + "'" ).size())
+      {
+        log( "Update database ", db.getName() + " collation to " + db.getCollation() );
+        _shell.executeUpdate( "ALTER DATABASE [" + db.getName() + "] COLLATE " + db.getCollation() );
+      }
+    }
+
+    // Update Recovery model if needed
+    if ( null != db.getRecoveryModel() )
+    {
+      if ( 0 == _shell.query( "SELECT name FROM sys.databases WHERE name = '" + db.getName() + "' and recovery_model_desc = '" + db.getRecoveryModel() + "'" ).size())
+      {
+        log( "Update database ", db.getName() + " recovery model to " + db.getRecoveryModel() );
+        _shell.executeUpdate( "ALTER DATABASE [" + db.getName() + "] SET RECOVERY " + db.getRecoveryModel() + " WITH NO_WAIT" );
+      }
+    }
+  }
+
+
+  public void dropDatabase( final Database db )
+    throws Exception
+  {
+    log( "Dropping database ", db.getName() );
+
+    _shell.executeUpdate( "DROP DATABASE [" + db.getName() + "] " );
   }
 
   private void log( final String... s )

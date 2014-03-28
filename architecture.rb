@@ -34,7 +34,14 @@ TEXT
       t.description(<<TEXT)
 A Database is a database that is expected to exist on the database server
 TEXT
+      # The name of the database
       t.string(:Name, 50)
+
+      # The collation for the database.  If not specified defaults to the server default
+      t.string(:Collation, 50, :nullable => true)
+
+      # The recovery model for the database.  If not specified defaults to the server default
+      t.s_enum(:RecoveryModel, ['FULL','SIMPLE'], :nullable => true)
 
       t.struct(:User, :User, :collection_type => :sequence)
     end
