@@ -3,7 +3,6 @@ package org.realityforge.sqlshell.mssql;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.realityforge.sqlshell.AbstractMssqlTest;
 import org.realityforge.sqlshell.SqlShell;
@@ -46,7 +45,7 @@ public class RunnerTest
     final Login login = login( "login1", "pwd" );
     cleanup( login );
 
-    _runner.apply( serverConfig( jLogins( jLogin( login ) ) ) );
+    _runner.apply( sc( jLogins( jLogin( login ) ) ) );
 
     assertTrue( _runner.loginExists( login ) );
 
@@ -65,7 +64,7 @@ public class RunnerTest
 
     _runner.createLogin( login );
 
-    _runner.apply( serverConfig( jLogins( jLogin( login.getName(), "newPwd" ) ) ) );
+    _runner.apply( sc( jLogins( jLogin( login.getName(), "newPwd" ) ) ) );
 
     assertTrue( _runner.loginExists( login ) );
     assertPasswordMatch( login.getName(), "newPwd" );
@@ -81,7 +80,7 @@ public class RunnerTest
     final Login login2 = login( "login2", "pwd" );
     cleanup( login1, login2 );
 
-    _runner.apply( serverConfig( jLogins( jLogin( login1 ), jLogin( login2 ) ) ) );
+    _runner.apply( sc( jLogins( jLogin( login1 ), jLogin( login2 ) ) ) );
 
     assertTrue( _runner.loginExists( login1 ) );
     assertTrue( _runner.loginExists( login2 ) );
@@ -123,7 +122,7 @@ public class RunnerTest
     assertTrue( _runner.loginExists( login1 ) );
     assertTrue( _runner.loginExists( login2 ) );
 
-    spyRunner.apply( serverConfig( jLogins( jLogin( login1 ) ), true ) );
+    spyRunner.apply( sc( jLogins( jLogin( login1 ) ), a( "remove_unwanted_logins", "true" ) ) );
 
     assertTrue( _runner.loginExists( login1 ) );
     assertFalse( _runner.loginExists( login2 ) );
@@ -161,8 +160,19 @@ public class RunnerTest
     _runner.removeLogin( l );
   }
 
+  private void cleanup( final Database... dbs )
+    throws Exception
+  {
+    for ( final Database db : dbs )
+    {
+      if ( _runner.databaseExists( db ) )
+      {
+        _runner.dropDatabase( db );
+      }
+    }
+  }
 
-  private void cleanup( final Login ... logins )
+  private void cleanup( final Login... logins )
     throws Exception
   {
     for ( final Login login : logins )
@@ -192,16 +202,11 @@ public class RunnerTest
     }
   }
 
-  private ServerConfig serverConfig( final String logins )
+  private ServerConfig sc( final String... attributes )
     throws IOException
   {
-    return ( new ObjectMapper() ).readValue( jServerConfig( logins, null ), ServerConfig.class );
-  }
-
-  private ServerConfig serverConfig( final String logins, final boolean cleanupLogins )
-    throws IOException
-  {
-    return ( new ObjectMapper() ).readValue( jServerConfig( logins, cleanupLogins ), ServerConfig.class );
+    System.out.println(jSC( attributes ));
+    return ( new ObjectMapper() ).readValue( jSC( attributes ), ServerConfig.class );
   }
 
   private Login login( final String name, final String password )
@@ -210,27 +215,16 @@ public class RunnerTest
     return _objectMapper.readValue( jLogin( name, password ), Login.class );
   }
 
-  private String jServerConfig( final String logins, final Boolean cleanupLogins )
+  private String jSC( final String... attributes )
     throws IOException
   {
-    final List <String>attributes = new ArrayList<>();
-    if ( null != logins )
-    {
-      attributes.add( aV( "logins", logins ) );
-    }
-
-    if ( null != cleanupLogins )
-    {
-       attributes.add( a("remove_unwanted_logins", cleanupLogins.toString() ) );
-    }
-
-    return e( attributes.toArray(new String[attributes.size()]) );
+    return e( attributes );
   }
 
-  private String jLogins( final String ... logins )
+  private String jLogins( final String... logins )
     throws IOException
   {
-    return "[" + join( ", ", logins ) + "]";
+    return a("logins", "[" + join( ", ", logins ) + "]");
   }
 
   private String jLogin( final Login login )
@@ -246,12 +240,14 @@ public class RunnerTest
 
   private String a( final String name, final String value )
   {
-    return "\"" + name + "\": \"" + value + "\"";
-  }
-
-  private String aV( final String name, final String value )
-  {
-    return "\"" + name + "\": " + value;
+    if ( '[' == value.charAt( 0 ) )
+    {
+      return "\"" + name + "\": " + value;
+    }
+    else
+    {
+      return "\"" + name + "\": \"" + value + "\"";
+    }
   }
 
   private String e( final String... attributes )
