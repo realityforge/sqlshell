@@ -72,7 +72,25 @@ public class Runner
       }
     }
 
-    // TODO Remove unwanted databases
+    if ( config.isDeleteUnmanagedDatabases() )
+    {
+      for ( final Database existingDb : getDatabases() )
+      {
+        boolean keep = false;
+        for ( final Database db : config.getDatabases() )
+        {
+          if ( db.getName().equals( existingDb.getName() ) )
+          {
+            keep = true;
+            break;
+          }
+        }
+        if ( !keep )
+        {
+          dropDatabase( existingDb );
+        }
+      }
+    }
   }
 
   protected List<Login> getLogins()
@@ -173,31 +191,21 @@ public class Runner
     return options;
   }
 
-  /*
   protected List<Database> getDatabases()
     throws Exception
   {
     final List<Map<String, Object>> dbRows = _shell.query(
-      "SELECT SP.name as name " +
-      "FROM " +
-      "  sys.syslogins L " +
-      "JOIN sys.server_principals SP ON SP.sid = L.sid " +
-      "WHERE " +
-      "  SP.type_desc IN ('SQL_LOGIN', 'WINDOWS_GROUP', 'WINDOWS_LOGIN') AND " +
-      "  SP.is_disabled = 0 AND " +
-      "  SP.name NOT LIKE 'NT AUTHORITY\\%' AND " +
-      "  SP.name NOT LIKE 'NT SERVICE\\%'"
-    );
+      "SELECT name FROM sys.databases WHERE name NOT IN ('" +
+      join("','", SYS_DATABASES.toArray(new String[SYS_DATABASES.size()])) + "')");
 
-    final ArrayList<Login> logins = new ArrayList<>();
+    final ArrayList<Database> dbs = new ArrayList<>();
 
-    for ( final Map<String, Object> loginRow : dbRows )
+    for ( final Map<String, Object> row : dbRows )
     {
-      logins.add( new Login( (String) loginRow.get( "name" ), null, null, null ) );
+      dbs.add( new Database( (String) row.get( "name" ), null, null, null ) );
     }
-    return logins;
+    return dbs;
   }
-  */
 
   public boolean databaseExists( final Database db )
     throws Exception
