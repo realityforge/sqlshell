@@ -172,21 +172,28 @@ public class RunnerTest
   }
 
   @Test
-  public void testAddDatabaseWithUser()
+  public void testUsers()
     throws Exception
   {
-    fail( "not implemented" );
 
-    final List<Login> logins = new ArrayList<>();
-    final Login l = new Login( "login", "pwd", null, null );
-    logins.add( l );
-    final ArrayList<User> users = new ArrayList<>();
-    users.add( new User( "user", "login" ) );
-    final List<Database> dbs = new ArrayList<>();
-    //dbs.add( new Database( "test_db2", users ) );
-    _runner.apply( new ServerConfig( false, logins, false, dbs ) );
+    final Login l = login( "login1", "pwd" );
+    final Login l2 = login( "login2", "pwd" );
+    final Database db = database( "test_db1" );
+    cleanup( l, l2 );
+    cleanup( db );
 
-    _runner.removeLogin( l );
+    _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers( jUser( "user1", "login1" ) ) ) ) ) );
+
+    assertUserMatch( db.getName(), "login1", "user1" );
+
+    _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers( jUser( "user1", "login2" ) ) ) ) ) );
+
+    assertUserMatch( db.getName(), "login2", "user1" );
+
+    cleanup( db );
+    cleanup( l, l2 );
   }
 
   private void cleanup( final Database... dbs )
@@ -229,6 +236,25 @@ public class RunnerTest
     {
       e.printStackTrace();
       fail( "Unable to log in as " + loginName + " with password " + password );
+    }
+  }
+
+  private void assertUserMatch( final String dbName, String loginName, final String userName )
+  {
+    try
+    {
+      assertEquals( 1, _shell.query( "SELECT U.name AS [user], SP.name AS [login] " +
+                                     "FROM [" + dbName + "].sys.database_principals U" +
+                                     "  JOIN sys.server_principals SP ON SP.sid = U.sid AND SP.is_disabled = 0 " +
+                                     "WHERE" +
+                                     "  U.type_desc IN ('SQL_USER','WINDOWS_USER','WINDOWS_GROUP') AND" +
+                                     "  U.name = '" + userName + "' AND" +
+                                     "  SP.name = '" + loginName + "'" ).size() );
+    }
+    catch ( final Exception e )
+    {
+      e.printStackTrace();
+      fail( "Unable to find user " + userName + " for login " + loginName + " in database " + dbName );
     }
   }
 
@@ -294,6 +320,11 @@ public class RunnerTest
     return a( "logins", "[" + join( ", ", logins ) + "]" );
   }
 
+  private String jUsers( final String... users )
+  {
+    return a( "users", "[" + join( ", ", users ) + "]" );
+  }
+
   private String jDatabases( final String... dbs )
     throws IOException
   {
@@ -324,6 +355,11 @@ public class RunnerTest
   private String jLogin( final String name, final String password )
   {
     return e( a( "name", name ), a( "password", password ) );
+  }
+
+  private String jUser( final String name, final String login )
+  {
+    return e( a( "name", name ), a( "login", login ) );
   }
 
   private String a( final String name, final String value )

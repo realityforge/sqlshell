@@ -7,6 +7,7 @@ import org.realityforge.sqlshell.SqlShell;
 import org.realityforge.sqlshell.data_type.mssql.Database;
 import org.realityforge.sqlshell.data_type.mssql.Login;
 import org.realityforge.sqlshell.data_type.mssql.ServerConfig;
+import org.realityforge.sqlshell.data_type.mssql.User;
 
 public class Runner
 {
@@ -20,16 +21,6 @@ public class Runner
   public void apply( final ServerConfig config )
     throws Exception
   {
-    // Create all required databases
-    for ( final Database db : config.getDatabases() )
-    {
-      if ( !databaseExists( db ) )
-      {
-        createDatabase( db );
-      }
-      alterDatabase( db );
-    }
-
     // Create all required logins
     for ( final Login login : config.getLogins() )
     {
@@ -64,6 +55,18 @@ public class Runner
         }
       }
     }
+
+    // Create all required databases
+    for ( final Database db : config.getDatabases() )
+    {
+      if ( !databaseExists( db ) )
+      {
+        createDatabase( db );
+      }
+      alterDatabase( db );
+    }
+
+    // TODO Remove unwanted databases
   }
 
   protected List<Login> getLogins()
@@ -209,8 +212,45 @@ public class Runner
           "ALTER DATABASE [" + db.getName() + "] SET RECOVERY " + db.getRecoveryModel() + " WITH NO_WAIT" );
       }
     }
+
+    // Create users
+    if ( null != db.getUsers() )
+    {
+      for ( final User user : db.getUsers() )
+      {
+        if ( !userExists( db, user ) )
+        {
+          createUser( db, user );
+        }
+        updateUser( db, user );
+      }
+    }
+
+    // TODO: Remove unwanted users
   }
 
+  private void createUser( final Database db, final User user )
+    throws Exception
+  {
+    log( "Creating user ", user.getName() );
+
+    _shell.executeUpdate(
+      "USE [" + db.getName() + "]; CREATE USER [" + user.getName() + "] FOR LOGIN [" + user.getLogin() + "]" );
+  }
+
+  private void updateUser( final Database db, final User user )
+    throws Exception
+  {
+    if ( _shell.query( "SELECT 1 FROM [" + db.getName() + "].sys.database_principals U " +
+                       "JOIN sys.server_principals SP ON SP.sid = U.sid AND SP.is_disabled = 0 " +
+                       "WHERE U.name = '" + user.getName() + "' AND SP.name = '" + user.getLogin() + "'" ).size() == 0 )
+    {
+      log( "Changing " + user.getName() + " to login " + user.getLogin() );
+
+      _shell.executeUpdate(
+        "USE [" + db.getName() + "]; ALTER USER [" + user.getName() + "] WITH LOGIN = [" + user.getLogin() + "]" );
+    }
+  }
 
   public void dropDatabase( final Database db )
     throws Exception
@@ -218,6 +258,13 @@ public class Runner
     log( "Dropping database ", db.getName() );
 
     _shell.executeUpdate( "DROP DATABASE [" + db.getName() + "] " );
+  }
+
+  public boolean userExists( final Database database, final User user )
+    throws Exception
+  {
+    return !_shell.query( "SELECT * FROM [" + database.getName() + "].sys.sysusers WHERE name = '" +
+                          user.getName() + "'" ).isEmpty();
   }
 
   private void log( final String... s )

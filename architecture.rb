@@ -26,7 +26,11 @@ TEXT
       t.description(<<TEXT)
 A User is an account within a Database that allows a Login to access artifacts within the database
 TEXT
+
+      # The name of the user within the database
       t.string(:Name, 50)
+
+      # The name of the Login that this user is associated with
       t.string(:Login, 50)
     end
 
@@ -43,7 +47,8 @@ TEXT
       # The recovery model for the database.  If not specified defaults to the server default
       t.s_enum(:RecoveryModel, ['FULL','SIMPLE'], :nullable => true)
 
-      t.struct(:User, :User, :collection_type => :sequence)
+      # The set of users to create for this database
+      t.struct(:User, :User, :collection_type => :sequence, :nullable => true)
     end
 
     data_module.struct(:ServerConfig) do |t|
