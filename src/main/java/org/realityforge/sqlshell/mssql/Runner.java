@@ -1,6 +1,8 @@
 package org.realityforge.sqlshell.mssql;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.realityforge.sqlshell.SqlShell;
@@ -12,6 +14,8 @@ import org.realityforge.sqlshell.data_type.mssql.User;
 public class Runner
 {
   private final SqlShell _shell;
+
+  private List<String> SYS_DATABASES = Arrays.asList( "master", "msdb", "model", "tempdb" );
 
   public Runner( final SqlShell shell )
   {
@@ -59,11 +63,14 @@ public class Runner
     // Create all required databases
     for ( final Database db : config.getDatabases() )
     {
-      if ( !databaseExists( db ) )
+      if ( !SYS_DATABASES.contains( db.getName() ) )
       {
-        createDatabase( db );
+        if ( !databaseExists( db ) )
+        {
+          createDatabase( db );
+        }
+        alterDatabase( db );
       }
-      alterDatabase( db );
     }
 
     // TODO Remove unwanted databases
@@ -166,6 +173,32 @@ public class Runner
 
     return options;
   }
+
+  /*
+  protected List<Database> getDatabases()
+    throws Exception
+  {
+    final List<Map<String, Object>> dbRows = _shell.query(
+      "SELECT SP.name as name " +
+      "FROM " +
+      "  sys.syslogins L " +
+      "JOIN sys.server_principals SP ON SP.sid = L.sid " +
+      "WHERE " +
+      "  SP.type_desc IN ('SQL_LOGIN', 'WINDOWS_GROUP', 'WINDOWS_LOGIN') AND " +
+      "  SP.is_disabled = 0 AND " +
+      "  SP.name NOT LIKE 'NT AUTHORITY\\%' AND " +
+      "  SP.name NOT LIKE 'NT SERVICE\\%'"
+    );
+
+    final ArrayList<Login> logins = new ArrayList<>();
+
+    for ( final Map<String, Object> loginRow : dbRows )
+    {
+      logins.add( new Login( (String) loginRow.get( "name" ), null, null, null ) );
+    }
+    return logins;
+  }
+  */
 
   public boolean databaseExists( final Database db )
     throws Exception

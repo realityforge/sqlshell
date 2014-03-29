@@ -12,7 +12,6 @@ import org.realityforge.sqlshell.data_type.mssql.Database;
 import org.realityforge.sqlshell.data_type.mssql.DatabaseRecoveryModel;
 import org.realityforge.sqlshell.data_type.mssql.Login;
 import org.realityforge.sqlshell.data_type.mssql.ServerConfig;
-import org.realityforge.sqlshell.data_type.mssql.User;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -147,6 +146,33 @@ public class RunnerTest
     assertRecoveryModel( db, DatabaseRecoveryModel.FULL.name() );
     assertCollation( db, "SQL_Latin1_General_CP1_CS_AS" );
     cleanup( db );
+  }
+
+  @Test
+  public void testCleanupDatabases()
+    throws Exception
+  {
+    final Database db1 = database( "test_db1" );
+    final Database db2 = database( "test_db2" );
+    cleanup( db1, db2 );
+
+    _runner.apply( sc( jLogins(), jDatabases( jDatabase( db1 ), jDatabase( db2 ) ) ) );
+
+    assertTrue( _runner.databaseExists( db1 ) );
+    assertTrue( _runner.databaseExists( db2 ) );
+
+    final ArrayList<Login> existingDbs = new ArrayList<Login>();
+    existingDbs.add( db1 );
+    existingDbs.add( db2 );
+    final Runner spyRunner = spy( _runner );
+    when( spyRunner.getDatabases() ).thenReturn( existingDbs );
+
+    _runner.apply( sc( jLogins(), jDatabases( jDatabase( db1 ) ), a("remove_unwanted_databases", "true") ) );
+
+    assertTrue( _runner.databaseExists( db1 ) );
+    assertFalse( _runner.databaseExists( db2 ) );
+
+    cleanup( db1 );
   }
 
   @Test
