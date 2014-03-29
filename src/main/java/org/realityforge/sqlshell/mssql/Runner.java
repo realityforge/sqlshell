@@ -2,7 +2,6 @@ package org.realityforge.sqlshell.mssql;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.realityforge.sqlshell.SqlShell;
@@ -40,7 +39,7 @@ public class Runner
     }
 
     // Remove any unwanted ones
-    if ( config.isRemoveUnwantedLogins() )
+    if ( config.isDeleteUnmanagedLogins() )
     {
       for ( final Login existingLogin : getLogins() )
       {

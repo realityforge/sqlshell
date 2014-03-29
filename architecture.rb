@@ -55,10 +55,10 @@ TEXT
       t.description(<<TEXT)
 The ServerConfig is the primary container which defines all the entire desired state of the database server
 TEXT
-      t.boolean(:RemoveUnwantedLogins)
+      t.boolean(:DeleteUnmanagedLogins)
       t.struct(:Login, :Login, :collection_type => :sequence)
 
-      t.boolean(:RemoveUnwantedDatabases)
+      t.boolean(:DeleteUnmanagedDatabases)
       t.struct(:Database, :Database, :collection_type => :sequence)
     end
   end

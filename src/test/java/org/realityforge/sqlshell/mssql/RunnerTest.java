@@ -124,7 +124,7 @@ public class RunnerTest
     assertTrue( _runner.loginExists( login1 ) );
     assertTrue( _runner.loginExists( login2 ) );
 
-    spyRunner.apply( sc( jLogins( jLogin( login1 ) ), a( "remove_unwanted_logins", "true" ), jDatabases() ) );
+    spyRunner.apply( sc( jLogins( jLogin( login1 ) ), a( "delete_unmanaged_logins", "true" ), jDatabases() ) );
 
     assertTrue( _runner.loginExists( login1 ) );
     assertFalse( _runner.loginExists( login2 ) );
@@ -148,6 +148,7 @@ public class RunnerTest
     cleanup( db );
   }
 
+  /*
   @Test
   public void testCleanupDatabases()
     throws Exception
@@ -161,19 +162,20 @@ public class RunnerTest
     assertTrue( _runner.databaseExists( db1 ) );
     assertTrue( _runner.databaseExists( db2 ) );
 
-    final ArrayList<Login> existingDbs = new ArrayList<Login>();
+    final ArrayList<Database> existingDbs = new ArrayList<>();
     existingDbs.add( db1 );
     existingDbs.add( db2 );
     final Runner spyRunner = spy( _runner );
     when( spyRunner.getDatabases() ).thenReturn( existingDbs );
 
-    _runner.apply( sc( jLogins(), jDatabases( jDatabase( db1 ) ), a("remove_unwanted_databases", "true") ) );
+    _runner.apply( sc( jLogins(), jDatabases( jDatabase( db1 ) ), a("delete_unmanaged_databases", "true") ) );
 
     assertTrue( _runner.databaseExists( db1 ) );
     assertFalse( _runner.databaseExists( db2 ) );
 
     cleanup( db1 );
   }
+  */
 
   @Test
   public void testUpdateDatabase()
