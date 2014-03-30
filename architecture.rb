@@ -35,6 +35,9 @@ TEXT
 
       # The name of the Login that this user is associated with
       t.string(:Login, 50)
+
+      # The list of roles that the user is granted within the database
+      t.string(:Role, 50, :collection_type => :sequence, :nullable => true)
     end
 
     data_module.struct(:Database) do |t|

@@ -225,7 +225,6 @@ public class RunnerTest
   public void testUsers()
     throws Exception
   {
-
     final Login l = login( "login1", "pwd" );
     final Login l2 = login( "login2", "pwd" );
     final Database db = database( "test_db1" );
@@ -233,14 +232,22 @@ public class RunnerTest
     cleanup( db );
 
     _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ) ),
-                       jDatabases( jDatabase( db.getName(), jUsers( jUser( "user1", "login1" ) ) ) ) ) );
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login1", a( "roles", "[\"db_datareader\",\"db_datawriter\"]" ) ) ) ) ) ) );
 
     assertUserMatch( db.getName(), "login1", "user1" );
+    assertTrue( hasDatabaseRole( db.getName(), "user1", "db_datareader" ) );
+    assertTrue( hasDatabaseRole( db.getName(), "user1", "db_datawriter" ) );
+    assertFalse( hasDatabaseRole( db.getName(), "user1", "db_ddladmin" ) );
 
     _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ) ),
-                       jDatabases( jDatabase( db.getName(), jUsers( jUser( "user1", "login2" ) ) ) ) ) );
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login2", a( "roles", "[\"db_datareader\",\"db_ddladmin\"]" ) ) ) ) ) ) );
 
     assertUserMatch( db.getName(), "login2", "user1" );
+    assertTrue( hasDatabaseRole( db.getName(), "user1", "db_datareader" ) );
+    assertFalse( hasDatabaseRole( db.getName(), "user1", "db_datawriter" ) );
+    assertTrue( hasDatabaseRole( db.getName(), "user1", "db_ddladmin" ) );
 
     cleanup( db );
     cleanup( l, l2 );
@@ -346,6 +353,12 @@ public class RunnerTest
     return _shell.query( _runner.loginHasServerRoleSQL( name, role ) ).size() == 1;
   }
 
+  private boolean hasDatabaseRole( final String database, final String user, final String role )
+    throws Exception
+  {
+    return _shell.query( _runner.userHasRoleSQL( database, user, role ) ).size() == 1;
+  }
+
   private ServerConfig sc( final String... attributes )
     throws IOException
   {
@@ -418,9 +431,13 @@ public class RunnerTest
     return e( attributes.toArray( new String[ attributes.size() ] ) );
   }
 
-  private String jUser( final String name, final String login )
+  private String jUser( final String name, final String login, final String... extras )
   {
-    return e( a( "name", name ), a( "login", login ) );
+    final List<String> attributes = new ArrayList<>( extras.length + 2 );
+    attributes.add( a( "name", name ) );
+    attributes.add( a( "login", login ) );
+    Collections.addAll( attributes, extras );
+    return e( attributes.toArray( new String[ attributes.size() ] ) );
   }
 
   private String a( final String name, final String value )

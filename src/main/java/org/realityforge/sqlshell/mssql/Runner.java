@@ -359,6 +359,42 @@ public class Runner
       _shell.executeUpdate(
         "USE [" + db.getName() + "]; ALTER USER [" + user.getName() + "] WITH LOGIN = [" + user.getLogin() + "]" );
     }
+
+    // Grant roles
+    if ( null != user.getRoles() )
+    {
+      for ( final String role : user.getRoles() )
+      {
+        ensureUserRole( db, user, role);
+      }
+    }
+
+    // Remove unwanted roles
+    final List<Map<String, Object>> existingRoles = _shell.query( userRolesSQL( db.getName(), user.getName() ) );
+    for ( final Map<String, Object> existingRole : existingRoles )
+    {
+      final String existingRoleName = (String) existingRole.get( "role" );
+      if ( null == user.getRoles() )
+      {
+        removeUserRole( db, user, existingRoleName );
+      }
+      else
+      {
+        boolean keep = false;
+        for ( final String role : user.getRoles() )
+        {
+          if ( existingRoleName.equalsIgnoreCase( role ) )
+          {
+            keep = true;
+            break;
+          }
+        }
+        if ( !keep )
+        {
+          removeUserRole( db, user, existingRoleName );
+        }
+      }
+    }
   }
 
   public void dropDatabase( final Database db )
@@ -374,6 +410,44 @@ public class Runner
   {
     return !_shell.query( "SELECT * FROM [" + database.getName() + "].sys.sysusers WHERE name = '" +
                           user.getName() + "'" ).isEmpty();
+  }
+
+  private void ensureUserRole( final Database db, final User user, final String role )
+    throws Exception
+  {
+    final String hasRole = userHasRoleSQL( db.getName(), user.getName(), role );
+
+    if ( 0 == _shell.query( hasRole ).size() )
+    {
+      log( "Granting role " + role + " for user " + user.getName() + " in database " + db.getName() );
+
+      _shell.executeUpdate(
+        "USE [" + db.getName() + "]; EXEC sys.sp_addrolemember [" + role + "], [" + user.getName() + "]" );
+    }
+  }
+
+  private void removeUserRole( final Database db, final User user, final String role )
+    throws Exception
+  {
+    log( "Removing role " + role + " from user " + user.getName() + " in database " + db.getName() );
+
+    _shell.executeUpdate(
+      "USE [" + db.getName() + "]; EXEC sys.sp_droprolemember [" + role + "], [" + user.getName() + "]" );
+  }
+
+  protected String userHasRoleSQL( final String database, final String user, final String role )
+  {
+    return userRolesSQL( database, user ) + " AND R.name = '" + role + "'";
+  }
+
+  private String userRolesSQL( final String database, final String user )
+  {
+    return "SELECT U.name AS [user],R.name AS [role] " +
+           "FROM [" + database + "].sys.database_principals R " +
+           "JOIN [" + database + "].sys.database_role_members RM ON RM.role_principal_id = R.principal_id " +
+           "JOIN [" + database + "].sys.database_principals U ON RM.member_principal_id = U.principal_id " +
+           "WHERE R.is_fixed_role = 1 AND " +
+           "U.name = '" + user + "'";
   }
 
   private void log( final String... s )
