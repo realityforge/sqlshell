@@ -20,6 +20,9 @@ TEXT
 
       # The default language for the login.
       t.string(:DefaultLanguage, 50, :nullable => true)
+
+      # The list of server roles that the login is granted
+      t.s_enum(:ServerRole, %w(PUBLIC SYSADMIN SECURITYADMIN SERVERADMIN SETUPADMIN PROCESSADMIN DISKADMIN DBCREATOR BULKADMIN), :collection_type => :sequence, :nullable => true)
     end
 
     data_module.struct(:User) do |t|

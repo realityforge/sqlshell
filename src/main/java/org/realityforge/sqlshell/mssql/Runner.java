@@ -7,6 +7,7 @@ import java.util.Map;
 import org.realityforge.sqlshell.SqlShell;
 import org.realityforge.sqlshell.data_type.mssql.Database;
 import org.realityforge.sqlshell.data_type.mssql.Login;
+import org.realityforge.sqlshell.data_type.mssql.LoginServerRole;
 import org.realityforge.sqlshell.data_type.mssql.ServerConfig;
 import org.realityforge.sqlshell.data_type.mssql.User;
 
@@ -28,25 +29,22 @@ public class Runner
     for ( final Login login : config.getLogins() )
     {
       // Check if login exists, if not create
-      if ( loginExists( login ) )
-      {
-        updateLogin( login );
-      }
-      else
+      if ( !loginExists( login ) )
       {
         createLogin( login );
       }
+      updateLogin( login );
     }
 
     // Remove any unwanted ones
     if ( config.isDeleteUnmanagedLogins() )
     {
-      for ( final Login existingLogin : getLogins() )
+      for ( final String existingLogin : getLogins() )
       {
         boolean keep = false;
         for ( final Login login : config.getLogins() )
         {
-          if ( login.getName().equals( existingLogin.getName() ) )
+          if ( login.getName().equals( existingLogin ) )
           {
             keep = true;
             break;
@@ -54,7 +52,7 @@ public class Runner
         }
         if ( !keep )
         {
-          removeLogin( existingLogin );
+          removeLogin( new Login( existingLogin, null, null, null, null ) );
         }
       }
     }
@@ -93,7 +91,7 @@ public class Runner
     }
   }
 
-  protected List<Login> getLogins()
+  protected List<String> getLogins()
     throws Exception
   {
     final List<Map<String, Object>> loginRows = _shell.query(
@@ -108,11 +106,11 @@ public class Runner
       "  SP.name NOT LIKE 'NT SERVICE\\%'"
     );
 
-    final ArrayList<Login> logins = new ArrayList<>();
+    final ArrayList<String> logins = new ArrayList<>();
 
     for ( final Map<String, Object> loginRow : loginRows )
     {
-      logins.add( new Login( (String) loginRow.get( "name" ), null, null, null ) );
+      logins.add( (String) loginRow.get( "name" ) );
     }
     return logins;
   }
@@ -147,6 +145,77 @@ public class Runner
   {
     log( "Updating login ", login.getName() );
     _shell.executeUpdate( "ALTER LOGIN [" + login.getName() + "] WITH " + loginOptions( login ) );
+
+    // Set up database level permissions for login
+    if ( null != login.getServerRoles() )
+    {
+      for ( final LoginServerRole loginServerRole : login.getServerRoles() )
+      {
+        ensureLoginRole( login.getName(), loginServerRole );
+      }
+    }
+
+    // Remove unwanted server roles
+    final List<Map<String, Object>> serverRoles = _shell.query( loginServerRolesSQL( login.getName() ) );
+    for ( final Map<String, Object> serverRole : serverRoles )
+    {
+      final String role = (String) serverRole.get( "name" );
+      if ( null == login.getServerRoles() )
+      {
+        removeLoginRole( login, role );
+      }
+      else
+      {
+        boolean keep = false;
+        for ( final LoginServerRole loginServerRole : login.getServerRoles() )
+        {
+          if ( role.equalsIgnoreCase( loginServerRole.toString() ) )
+          {
+            keep = true;
+            break;
+          }
+        }
+        if ( !keep )
+        {
+          removeLoginRole( login, role );
+        }
+      }
+    }
+  }
+
+  private void removeLoginRole( final Login login, final String role )
+    throws Exception
+  {
+    log( "Removing role " + role + " from " + login.getName() );
+
+    _shell.execute(
+      "EXEC sys.sp_dropsrvrolemember @loginame = N'" + login.getName() + "', @rolename = N'" + role + "'" );
+  }
+
+  private void ensureLoginRole( final String loginName, final LoginServerRole role )
+    throws Exception
+  {
+    final String loginRoleExistsSql = loginHasServerRoleSQL( loginName, role );
+
+    if ( 0 == _shell.query( loginRoleExistsSql ).size() )
+    {
+      log( "Granting role " + role + " for login " + loginName );
+      _shell.executeUpdate(
+        "EXEC sys.sp_addsrvrolemember @loginame = N'" + loginName + "', @rolename = N'" + role + "'" );
+    }
+  }
+
+  protected String loginHasServerRoleSQL( final String loginName, final LoginServerRole role )
+  {
+    return loginServerRolesSQL( loginName ) + " AND RP.name = N'" + role + "'";
+  }
+
+  private String loginServerRolesSQL( final String loginName )
+  {
+    return "SELECT RP.name FROM sys.server_principals P " +
+           "JOIN sys.server_role_members SRM ON SRM.member_principal_id = P.principal_id " +
+           "JOIN sys.server_principals RP ON RP.principal_id = SRM.role_principal_id AND RP.type_desc = 'SERVER_ROLE' " +
+           "WHERE P.name = N'" + loginName + "'";
   }
 
   public void createLogin( final Login login )
@@ -196,7 +265,7 @@ public class Runner
   {
     final List<Map<String, Object>> dbRows = _shell.query(
       "SELECT name FROM sys.databases WHERE name NOT IN ('" +
-      join("','", SYS_DATABASES.toArray(new String[SYS_DATABASES.size()])) + "')");
+      join( "','", SYS_DATABASES.toArray( new String[ SYS_DATABASES.size() ] ) ) + "')" );
 
     final ArrayList<Database> dbs = new ArrayList<>();
 

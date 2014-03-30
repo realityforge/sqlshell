@@ -11,6 +11,7 @@ import org.realityforge.sqlshell.SqlShell;
 import org.realityforge.sqlshell.data_type.mssql.Database;
 import org.realityforge.sqlshell.data_type.mssql.DatabaseRecoveryModel;
 import org.realityforge.sqlshell.data_type.mssql.Login;
+import org.realityforge.sqlshell.data_type.mssql.LoginServerRole;
 import org.realityforge.sqlshell.data_type.mssql.ServerConfig;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -44,7 +45,8 @@ public class RunnerTest
   public void loginCreate()
     throws Exception
   {
-    final Login login = login( "login1", "pwd" );
+    final Login login = login( "login1", "pwd", a( "server_roles", "[\"" + LoginServerRole.SYSADMIN + "\",\"" +
+                                                                   LoginServerRole.DBCREATOR + "\"]" ) );
     cleanup( login );
 
     _runner.apply( sc( jLogins( jLogin( login ) ), jDatabases() ) );
@@ -52,6 +54,8 @@ public class RunnerTest
     assertTrue( _runner.loginExists( login ) );
 
     assertPasswordMatch( login.getName(), login.getPassword() );
+    assertTrue( hasServerRole( login.getName(), LoginServerRole.SYSADMIN ) );
+    assertTrue( hasServerRole( login.getName(), LoginServerRole.DBCREATOR ) );
 
     _runner.removeLogin( login );
     assertFalse( _runner.loginExists( login ) );
@@ -61,12 +65,22 @@ public class RunnerTest
   public void loginUpdate()
     throws Exception
   {
-    final Login login = login( "login1", "pwd" );
+    final Login login = login( "login1", "pwd", a( "server_roles", "[\"" + LoginServerRole.BULKADMIN + "\",\"" +
+                                                                   LoginServerRole.DBCREATOR + "\"]" ) );
     cleanup( login );
 
-    _runner.createLogin( login );
+    _runner.apply( sc( jLogins( jLogin( login ) ), jDatabases() ) );
 
-    _runner.apply( sc( jLogins( jLogin( login.getName(), "newPwd" ) ), jDatabases() ) );
+    assertTrue( hasServerRole( login.getName(), LoginServerRole.BULKADMIN ) );
+    assertTrue( hasServerRole( login.getName(), LoginServerRole.DBCREATOR ) );
+
+    _runner.apply( sc( jLogins( jLogin( login.getName(), "newPwd",
+                                        a( "server_roles", "[\"" + LoginServerRole.SYSADMIN + "\",\"" +
+                                                           LoginServerRole.DBCREATOR + "\"]" ) ) ), jDatabases() ) );
+
+    assertTrue( hasServerRole( login.getName(), LoginServerRole.SYSADMIN ) );
+    assertTrue( hasServerRole( login.getName(), LoginServerRole.DBCREATOR ) );
+    assertFalse( hasServerRole( login.getName(), LoginServerRole.BULKADMIN ) );
 
     assertTrue( _runner.loginExists( login ) );
     assertPasswordMatch( login.getName(), "newPwd" );
@@ -87,15 +101,15 @@ public class RunnerTest
     assertTrue( _runner.loginExists( login1 ) );
     assertTrue( _runner.loginExists( login2 ) );
 
-    final List<Login> existingLogins = _runner.getLogins();
+    final List<String> existingLogins = _runner.getLogins();
     boolean found1 = false, found2 = false;
-    for ( final Login existingLogin : existingLogins )
+    for ( final String existingLogin : existingLogins )
     {
-      if ( existingLogin.getName().equals( login1.getName() ) )
+      if ( existingLogin.equals( login1.getName() ) )
       {
         found1 = true;
       }
-      if ( existingLogin.getName().equals( login2.getName() ) )
+      if ( existingLogin.equals( login2.getName() ) )
       {
         found2 = true;
       }
@@ -115,9 +129,9 @@ public class RunnerTest
     _runner.createLogin( login1 );
     _runner.createLogin( login2 );
 
-    final ArrayList<Login> existingLogins = new ArrayList<>();
-    existingLogins.add( login1 );
-    existingLogins.add( login2 );
+    final ArrayList<String> existingLogins = new ArrayList<>();
+    existingLogins.add( login1.getName() );
+    existingLogins.add( login2.getName() );
     final Runner spyRunner = spy( _runner );
     when( spyRunner.getLogins() ).thenReturn( existingLogins );
 
@@ -172,12 +186,12 @@ public class RunnerTest
     final Runner spyRunner = spy( _runner );
     when( spyRunner.getDatabases() ).thenReturn( existingDbs );
 
-    spyRunner.apply( sc( jLogins(), jDatabases( jDatabase( db1 ) ), a("delete_unmanaged_databases", "false") ) );
+    spyRunner.apply( sc( jLogins(), jDatabases( jDatabase( db1 ) ), a( "delete_unmanaged_databases", "false" ) ) );
 
     assertTrue( _runner.databaseExists( db1 ) );
     assertTrue( _runner.databaseExists( db2 ) );
 
-    spyRunner.apply( sc( jLogins(), jDatabases( jDatabase( db1 ) ), a("delete_unmanaged_databases", "true") ) );
+    spyRunner.apply( sc( jLogins(), jDatabases( jDatabase( db1 ) ), a( "delete_unmanaged_databases", "true" ) ) );
 
     assertTrue( _runner.databaseExists( db1 ) );
     assertFalse( _runner.databaseExists( db2 ) );
@@ -326,6 +340,12 @@ public class RunnerTest
     }
   }
 
+  private boolean hasServerRole( final String name, final LoginServerRole role )
+    throws Exception
+  {
+    return _shell.query( _runner.loginHasServerRoleSQL( name, role ) ).size() == 1;
+  }
+
   private ServerConfig sc( final String... attributes )
     throws IOException
   {
@@ -338,10 +358,11 @@ public class RunnerTest
     return _objectMapper.readValue( jDatabase( name, attributes ), Database.class );
   }
 
-  private Login login( final String name, final String password )
+  private Login login( final String name, final String password, final String... extras )
     throws IOException
   {
-    return _objectMapper.readValue( jLogin( name, password ), Login.class );
+    System.out.println( jLogin( name, password, extras ) );
+    return _objectMapper.readValue( jLogin( name, password, extras ), Login.class );
   }
 
   private String jSC( final String... attributes )
@@ -388,9 +409,13 @@ public class RunnerTest
     return _objectMapper.writeValueAsString( login );
   }
 
-  private String jLogin( final String name, final String password )
+  private String jLogin( final String name, final String password, final String... extras )
   {
-    return e( a( "name", name ), a( "password", password ) );
+    final List<String> attributes = new ArrayList<>( extras.length + 2 );
+    attributes.add( a( "name", name ) );
+    attributes.add( a( "password", password ) );
+    Collections.addAll( attributes, extras );
+    return e( attributes.toArray( new String[ attributes.size() ] ) );
   }
 
   private String jUser( final String name, final String login )
