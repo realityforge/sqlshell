@@ -25,6 +25,24 @@ TEXT
       t.s_enum(:ServerRole, %w(PUBLIC SYSADMIN SECURITYADMIN SERVERADMIN SETUPADMIN PROCESSADMIN DISKADMIN DBCREATOR BULKADMIN), :collection_type => :sequence, :nullable => true)
     end
 
+    # A Permission granted to a database user
+    data_module.struct(:Permission) do |t|
+      # The type of permission being applied
+      t.s_enum(:PermissionAction, %w(GRANT DENY))
+
+      # The type of the thing being configured
+      t.s_enum(:SecurableType, %w(DATABASE OBJECT TYPE))
+
+      # The name of the thing being secured, if required
+      t.string(:Securable, 100, :nullable => true)
+
+      # The type of permission being applied
+      t.s_enum(:Permission, [
+                    'BACKUP DATABASE', 'BACKUP LOG', 'CREATE DATABASE', 'CREATE DEFAULT', 'CREATE FUNCTION',
+                    'CREATE PROCEDURE', 'CREATE RULE', 'CREATE TABLE', 'CREATE VIEW',
+                    'EXECUTE', 'REFERENCES', 'DELETE', 'INSERT', 'UPDATE', 'SELECT', 'CONNECT'])
+    end
+
     data_module.struct(:User) do |t|
       t.description(<<TEXT)
 A User is an account within a Database that allows a Login to access artifacts within the database
@@ -38,6 +56,9 @@ TEXT
 
       # The list of roles that the user is granted within the database
       t.string(:Role, 50, :collection_type => :sequence, :nullable => true)
+
+      # The list of permissions to apply to the user
+      t.struct(:Permission, :Permission, :collection_type => :sequence, :nullable => true)
     end
 
     data_module.struct(:Database) do |t|
