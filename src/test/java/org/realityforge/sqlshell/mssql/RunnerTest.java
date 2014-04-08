@@ -12,7 +12,12 @@ import org.realityforge.sqlshell.data_type.mssql.Database;
 import org.realityforge.sqlshell.data_type.mssql.DatabaseRecoveryModel;
 import org.realityforge.sqlshell.data_type.mssql.Login;
 import org.realityforge.sqlshell.data_type.mssql.LoginServerRole;
+import org.realityforge.sqlshell.data_type.mssql.Permission;
+import org.realityforge.sqlshell.data_type.mssql.PermissionAction;
+import org.realityforge.sqlshell.data_type.mssql.PermissionPermission;
+import org.realityforge.sqlshell.data_type.mssql.PermissionSecurableType;
 import org.realityforge.sqlshell.data_type.mssql.ServerConfig;
+import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
@@ -253,6 +258,89 @@ public class RunnerTest
     cleanup( l, l2 );
   }
 
+  @Test
+  public void testPermissions()
+    throws Exception
+  {
+    final Login l = login( "login1", "pwd" );
+    final Database db = database( "test_db1" );
+    cleanup( l );
+    cleanup( db );
+
+    _runner.apply( sc( jLogins( jLogin( l ) ), jDatabases( jDatabase( db ) ) ) );
+
+    _shell.execute( "USE test_db1; execute('create PROCEDURE aaa AS SELECT 1')" );
+
+    final Permission grantConnect = permission( a( "permission", PermissionPermission.CONNECT.toString() ),
+                                                a( "securable_type", PermissionSecurableType.DATABASE.toString() ) );
+    final Permission grantBackupDB = permission( a( "permission", PermissionPermission.BACKUP_DATABASE.toString() ),
+                                                 a( "securable_type", PermissionSecurableType.DATABASE.toString() ) );
+    final Permission grantExecuteAAA = permission( a( "permission", PermissionPermission.EXECUTE.toString() ),
+                                                   a( "securable_type", PermissionSecurableType.OBJECT.toString() ),
+                                                   a( "securable", "aaa" ) );
+    final Permission grantBackupLog = permission( a( "permission", PermissionPermission.BACKUP_LOG.toString() ),
+                                                  a( "securable_type", PermissionSecurableType.DATABASE.toString() ) );
+    final Permission denyExecuteAAA = permission( a( "action", PermissionAction.DENY.toString() ),
+                                                  a( "permission", PermissionPermission.EXECUTE.toString() ),
+                                                  a( "securable_type", PermissionSecurableType.OBJECT.toString() ),
+                                                  a( "securable", "aaa" ) );
+
+    _runner.apply( sc( jLogins( jLogin( l ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login1",
+                                jPermissions( jPermission( grantBackupDB ),
+                                              jPermission( grantExecuteAAA ),
+                                              jPermission( grantConnect ) ) ) ) ) ) ) );
+
+    final List<Map<String, Object>> permissions =
+      _shell.query( "USE [" + db.getName() + "];" + _runner.userPermissionsSQL( db.getName(), "user1", null ) );
+    System.out.println( permissions );
+
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantConnect ) );
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupDB ) );
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantExecuteAAA ) );
+    assertFalse( hasPermission( db.getName(), "user1", grantBackupLog ) );
+
+    _runner.apply( sc( jLogins( jLogin( l ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login1",
+                                jPermissions( jPermission( grantConnect ),
+                                              jPermission( grantBackupLog ),
+                                              jPermission( denyExecuteAAA ) ) ) ) ) ) ) );
+
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantConnect ) );
+    assertFalse( hasPermission( db.getName(), "user1", grantBackupDB ) );  // Autocleaned
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupLog ) );
+    assertTrue( hasDeniedPermission( db.getName(), "user1", denyExecuteAAA ) );
+    assertFalse( hasGrantedPermission( db.getName(), "user1", grantExecuteAAA ) );
+
+    // TODO: add support for not cleaning permissions
+    _runner.apply( sc( jLogins( jLogin( l ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login1",
+                                jPermissions(
+                                  jPermission( a( "action", PermissionAction.REVOKE.toString() ),
+                                               a( "permission", PermissionPermission.EXECUTE.toString() ),
+                                               a( "securable_type", PermissionSecurableType.OBJECT.toString() ),
+                                               a( "securable", "aaa" ) )
+                                ) ) ) ) ) ) );
+
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantConnect ) );
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupLog ) );
+    assertFalse( hasPermission( db.getName(), "user1", grantExecuteAAA ) );
+    assertFalse( hasPermission( db.getName(), "user1", denyExecuteAAA ) );
+
+    _runner.apply( sc( jLogins( jLogin( l ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login1" ) ) ) ) ) );
+
+    Assert.assertEquals(
+      _shell.query( "USE [" + db.getName() + "];" + _runner.userPermissionsSQL( db.getName(), "user1", null ) ).size(), 0 );
+
+    cleanup( db );
+    cleanup( l );
+  }
+
   private void cleanup( final Database... dbs )
     throws Exception
   {
@@ -359,6 +447,32 @@ public class RunnerTest
     return _shell.query( _runner.userHasRoleSQL( database, user, role ) ).size() == 1;
   }
 
+  private boolean hasDeniedPermission( final String database,
+                                          final String user,
+                                          final Permission permission )
+    throws Exception
+  {
+    return _shell.query( "USE [" + database + "];" +
+      _runner.userHasPermissionSQL( database, user, permission, PermissionAction.DENY ) ).size() == 1;
+  }
+
+  private boolean hasGrantedPermission( final String database,
+                                        final String user,
+                                        final Permission permission )
+    throws Exception
+  {
+    return _shell.query( "USE [" + database + "];" +
+      _runner.userHasPermissionSQL( database, user, permission, PermissionAction.GRANT ) ).size() == 1;
+  }
+
+  private boolean hasPermission( final String database,
+                                 final String user,
+                                 final Permission permission )
+    throws Exception
+  {
+    return hasGrantedPermission( database, user, permission) ||  hasDeniedPermission( database, user, permission);
+  }
+
   private ServerConfig sc( final String... attributes )
     throws IOException
   {
@@ -374,8 +488,13 @@ public class RunnerTest
   private Login login( final String name, final String password, final String... extras )
     throws IOException
   {
-    System.out.println( jLogin( name, password, extras ) );
     return _objectMapper.readValue( jLogin( name, password, extras ), Login.class );
+  }
+
+  private Permission permission( final String... attributes )
+    throws IOException
+  {
+    return _objectMapper.readValue( jPermission( attributes ), Permission.class );
   }
 
   private String jSC( final String... attributes )
@@ -422,6 +541,12 @@ public class RunnerTest
     return _objectMapper.writeValueAsString( login );
   }
 
+  private String jPermission( final Permission permission )
+    throws IOException
+  {
+    return _objectMapper.writeValueAsString( permission );
+  }
+
   private String jLogin( final String name, final String password, final String... extras )
   {
     final List<String> attributes = new ArrayList<>( extras.length + 2 );
@@ -438,6 +563,16 @@ public class RunnerTest
     attributes.add( a( "login", login ) );
     Collections.addAll( attributes, extras );
     return e( attributes.toArray( new String[ attributes.size() ] ) );
+  }
+
+  private String jPermissions( final String... permissions )
+  {
+    return a( "permissions", "[" + join( ", ", permissions ) + "]" );
+  }
+
+  private String jPermission( final String... attributes )
+  {
+    return e( attributes );
   }
 
   private String a( final String name, final String value )

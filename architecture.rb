@@ -27,8 +27,8 @@ TEXT
 
     # A Permission granted to a database user
     data_module.struct(:Permission) do |t|
-      # The type of permission being applied
-      t.s_enum(:PermissionAction, %w(GRANT DENY))
+      # The type of permission being applied.  Default behaviour is grant
+      t.s_enum(:Action, %w(GRANT DENY REVOKE), :nullable => true)
 
       # The type of the thing being configured
       t.s_enum(:SecurableType, %w(DATABASE OBJECT TYPE))
@@ -38,8 +38,8 @@ TEXT
 
       # The type of permission being applied
       t.s_enum(:Permission, [
-                    'BACKUP DATABASE', 'BACKUP LOG', 'CREATE DATABASE', 'CREATE DEFAULT', 'CREATE FUNCTION',
-                    'CREATE PROCEDURE', 'CREATE RULE', 'CREATE TABLE', 'CREATE VIEW',
+                    'BACKUP_DATABASE', 'BACKUP_LOG', 'CREATE_DATABASE', 'CREATE_DEFAULT', 'CREATE_FUNCTION',
+                    'CREATE_PROCEDURE', 'CREATE_RULE', 'CREATE_TABLE', 'CREATE_VIEW',
                     'EXECUTE', 'REFERENCES', 'DELETE', 'INSERT', 'UPDATE', 'SELECT', 'CONNECT'])
     end
 
@@ -68,6 +68,11 @@ TEXT
       # The name of the database
       t.string(:Name, 50)
 
+      # Whether this database is 'managed'.
+      # Any users/roles/permissions not found in the configuration will be deleted from a Managed database
+      # Default is false
+      t.boolean(:Managed, :nullable => true)
+
       # The collation for the database.  If not specified defaults to the server default
       t.string(:Collation, 50, :nullable => true)
 
@@ -76,17 +81,43 @@ TEXT
 
       # The set of users to create for this database
       t.struct(:User, :User, :collection_type => :sequence, :nullable => true)
+
+
     end
 
     data_module.struct(:ServerConfig) do |t|
       t.description(<<TEXT)
 The ServerConfig is the primary container which defines all the entire desired state of the database server
 TEXT
-      t.boolean(:DeleteUnmanagedLogins)
+      # The logins that must exist
       t.struct(:Login, :Login, :collection_type => :sequence)
 
-      t.boolean(:DeleteUnmanagedDatabases)
+      # The databases that must exist
       t.struct(:Database, :Database, :collection_type => :sequence)
+
+      # Whether existing databases not listed in [Databases] should be deleted from the server
+      # Default is false
+      t.boolean(:DeleteUnmanagedDatabases, :nullable => true)
+
+      # Whether existing logins not listed in [Logins] should be deleted from managed databases
+      # Default is false
+      t.boolean(:DeleteUnmanagedLogins, :nullable => true)
+
+      # Whether existing roles should be deleted from Managed databases if they are not included in the configuration
+      # Default is false
+      t.boolean(:DeleteUnmanagedDatabaseRoles, :nullable => true)
+
+      # Whether existing permissions should be deleted from Managed databases if they are not included in the configuration
+      # Default is false
+      t.boolean(:DeleteUnmanagedPermissions, :nullable => true)
+
+      # Whether existing users should be deleted from Managed databases if they are not included in the configuration
+      # Default is false
+      t.boolean(:DeleteUnmanagedUsers, :nullable => true)
+
+      # Whether existing roles should be deleted from the server if they are not included in the configuration
+      # Default is false
+      t.boolean(:DeleteUnmanagedServerRoles, :nullable => true)
     end
   end
 end
