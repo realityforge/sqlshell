@@ -99,23 +99,23 @@ TEXT
       # Default is false
       t.boolean(:DeleteUnmanagedDatabases, :nullable => true)
 
-      # Whether existing logins not listed in [Logins] should be deleted from managed databases
+      # Whether existing logins not listed in [Logins] should be deleted from the server
       # Default is false
       t.boolean(:DeleteUnmanagedLogins, :nullable => true)
 
-      # Whether existing roles should be deleted from Managed databases if they are not included in the configuration
+      # Whether existing roles should be deleted from any database which is configured but has false for 'managed'
       # Default is false
       t.boolean(:DeleteUnmanagedDatabaseRoles, :nullable => true)
 
-      # Whether existing permissions should be deleted from Managed databases if they are not included in the configuration
+      # Whether existing permissions should be deleted from any database which is configured but has false for 'managed'
       # Default is false
       t.boolean(:DeleteUnmanagedPermissions, :nullable => true)
 
-      # Whether existing users should be deleted from Managed databases if they are not included in the configuration
+      # Whether existing users should be deleted from any database which is configured but has false for 'managed'
       # Default is false
       t.boolean(:DeleteUnmanagedUsers, :nullable => true)
 
-      # Whether existing roles should be deleted from the server if they are not included in the configuration
+      # Whether existing server roles should be deleted from logins if they are not included in the configuration
       # Default is false
       t.boolean(:DeleteUnmanagedServerRoles, :nullable => true)
     end

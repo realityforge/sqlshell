@@ -2,9 +2,9 @@ package org.realityforge.sqlshell.mssql;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.realityforge.sqlshell.SqlShell;
 import org.realityforge.sqlshell.data_type.mssql.Database;
 import org.realityforge.sqlshell.data_type.mssql.Login;
@@ -42,7 +42,7 @@ public class Runner
     }
 
     // Remove any unwanted ones
-    if ( config.isDeleteUnmanagedLogins() )
+    if ( Boolean.TRUE.equals( config.isDeleteUnmanagedLogins() ) )
     {
       for ( final String existingLogin : getLogins() )
       {
@@ -71,11 +71,11 @@ public class Runner
         {
           createDatabase( db );
         }
-        alterDatabase( db );
+        alterDatabase( db, config );
       }
     }
 
-    if ( config.isDeleteUnmanagedDatabases() )
+    if ( Boolean.TRUE.equals( config.isDeleteUnmanagedDatabases() ) )
     {
       for ( final Database existingDb : getDatabases() )
       {
@@ -276,7 +276,7 @@ public class Runner
 
     for ( final Map<String, Object> row : dbRows )
     {
-      dbs.add( new Database( (String) row.get( "name" ), null, null, null ) );
+      dbs.add( new Database( (String) row.get( "name" ), false, null, null, null ) );
     }
     return dbs;
   }
@@ -295,7 +295,7 @@ public class Runner
       "CREATE DATABASE [" + db.getName() + "] " + ( null != db.getCollation() ? "COLLATE " + db.getCollation() : "" ) );
   }
 
-  private void alterDatabase( final Database db )
+  private void alterDatabase( final Database db, final ServerConfig config )
     throws Exception
   {
     // Update Collation model if needed
@@ -341,6 +341,9 @@ public class Runner
     }
 
     // TODO: Remove unwanted users
+
+    // Remove unwanted permissions
+    removeUnwantedPermissions( db, config );
   }
 
   private void createUser( final Database db, final User user )
@@ -409,29 +412,57 @@ public class Runner
         ensurePermission( db, user, permission );
       }
     }
+  }
 
-    // Remove unwanted permissions
+  private void removeUnwantedPermissions( final Database db, final ServerConfig config )
+    throws Exception
+  {
+    if ( !Boolean.TRUE.equals( db.isManaged() ) && !Boolean.TRUE.equals( config.isDeleteUnmanagedPermissions() ) )
+    {
+      return;
+    }
+
+    // Obtain all permissions, for all users, in the database
     final List<Map<String, Object>> existingPermissions =
-      _shell.query( "USE [" + db.getName() + "]; " + userPermissionsSQL( db.getName(), user.getName(), null ) );
+      _shell.query( "USE [" + db.getName() + "]; " + allDatabasePermissionsSQL() );
+
+    // Collect all permissions that should exist and store against user name
+    final Map<String, List<Permission>> wantedPermissions = new HashMap<>();
+    if ( null != db.getUsers() )
+    {
+      for ( final User user : db.getUsers() )
+      {
+        final List<Permission> userPermissions = user.getPermissions();
+        if ( null == userPermissions || userPermissions.size() == 0 )
+        {
+          continue;
+        }
+        wantedPermissions.put( user.getName().toLowerCase(), userPermissions );
+      }
+    }
+
     for ( final Map<String, Object> existingPermissionRow : existingPermissions )
     {
+      final String userName = (String) existingPermissionRow.get( "user" );
       final String state = (String) existingPermissionRow.get( "state" );
       final String type = (String) existingPermissionRow.get( "type" );
       final String permissionName = (String) existingPermissionRow.get( "permission" );
-      final Permission existingPermission = new Permission( PermissionAction.valueOf( state ),
-                                           PermissionSecurableType.valueOf( type ),
-                                           (String) existingPermissionRow.get("object_name"),
-                                           PermissionPermission.valueOf( permissionName.replaceAll( " ", "_" ) ) );
+      final Permission existingPermission =
+        new Permission(
+          PermissionAction.valueOf( state ),
+          PermissionSecurableType.valueOf( "OBJECT_OR_COLUMN".equalsIgnoreCase( type ) ? "OBJECT" : type ),
+          (String) existingPermissionRow.get( "object_name" ),
+          PermissionPermission.valueOf( permissionName.replaceAll( " ", "_" ) ) );
 
-      if ( null == user.getPermissions() )
+      if ( !wantedPermissions.containsKey( userName.toLowerCase() ) )
       {
-        revokePermission( db, user, existingPermission );
+        revokePermission( db, userName, existingPermission );
       }
       else
       {
         boolean keep = false;
 
-        for ( final Permission permission : user.getPermissions() )
+        for ( final Permission permission : wantedPermissions.get( userName ) )
         {
           if ( permissionsAreEqual( existingPermission, permission ) )
           {
@@ -441,11 +472,10 @@ public class Runner
         }
         if ( !keep )
         {
-          revokePermission( db, user, existingPermission );
+          revokePermission( db, userName, existingPermission );
         }
       }
     }
-
   }
 
   private boolean permissionsAreEqual( final Permission p1, final Permission p2 )
@@ -464,14 +494,14 @@ public class Runner
     {
       if ( p2.getAction() == null )
       {
-        if ( !PermissionAction.GRANT.equals(p1.getAction()))
+        if ( !PermissionAction.GRANT.equals( p1.getAction() ) )
         {
           return false;
         }
       }
       else
       {
-        if ( !p1.getAction().equals( p2.getAction() ))
+        if ( !p1.getAction().equals( p2.getAction() ) )
         {
           return false;
         }
@@ -479,9 +509,9 @@ public class Runner
     }
     else
     {
-      if ( p2.getAction() != null)
+      if ( p2.getAction() != null )
       {
-        if ( !PermissionAction.GRANT.equals(p2.getAction()))
+        if ( !PermissionAction.GRANT.equals( p2.getAction() ) )
         {
           return false;
         }
@@ -489,7 +519,9 @@ public class Runner
     }
 
     if ( null != p1.getSecurable() )
+    {
       return p1.getSecurable().equalsIgnoreCase( p2.getSecurable() );
+    }
     return p2.getSecurable() == null;
   }
 
@@ -549,13 +581,14 @@ public class Runner
 
     if ( action == PermissionAction.REVOKE && userHasPermission )
     {
-      revokePermission( db, user, permission );
+      revokePermission( db, user.getName(), permission );
     }
     else if ( !userHasPermission )
     {
       log( "Adding " + action + " permission in " + db.getName() + " for " + user.getName() + ": " +
            permission.getSecurableType() + "." + permission.getPermission() + " on " + permission.getSecurable() );
-      _shell.execute( "USE [" + db.getName() + "]; " + permissionSql( action.toString(), permission, db, user ) );
+      _shell.execute(
+        "USE [" + db.getName() + "]; " + permissionSql( action.toString(), permission, db, user.getName() ) );
     }
     else
     {
@@ -567,21 +600,24 @@ public class Runner
     }
   }
 
-  private void revokePermission( final Database db, final User user, final Permission permission )
+  private void revokePermission( final Database db, final String userName, final Permission permission )
     throws Exception
   {
-    log( "Revoking permission in " + db.getName() + " for " + user.getName() + ": " +
+    log( "Revoking permission in " + db.getName() + " for " + userName + ": " +
          permission.getSecurableType() + "." + permission.getPermission() + " on " + permission.getSecurable() );
-    _shell.execute( "USE [" + db.getName() + "]; " + permissionSql( "REVOKE", permission, db, user ) );
+    _shell.execute( "USE [" + db.getName() + "]; " + permissionSql( "REVOKE", permission, db, userName ) );
   }
 
-  private String permissionSql( final String action, final Permission permission, final Database db, final User user )
+  private String permissionSql( final String action,
+                                final Permission permission,
+                                final Database db,
+                                final String userName )
   {
     return action + " " +
            permission.getPermission().toString().replaceAll( "_", " " ) + " ON " +
            permission.getSecurableType() + "::" +
            quotedSecurable( db.getName(), permission ) + " TO [" +
-           user.getName() + "]";
+           userName + "]";
   }
 
   protected String userHasRoleSQL( final String database, final String user, final String role )
@@ -666,20 +702,34 @@ public class Runner
 
   protected String userPermissionsSQL( final String database, final String user, final Permission permission )
   {
-    return "SELECT U.name as [user], P.class_desc as [type], P.permission_name as [permission], P.state_desc as [state], O.name as [object_name], S.name as [schema] " +
-           "FROM sys.database_permissions P " +
-           "JOIN sys.database_principals U ON P.grantee_principal_id = U.principal_id AND U.type_desc IN ('SQL_USER','WINDOWS_USER','WINDOWS_GROUP')" +
-           "LEFT JOIN sys.all_objects O ON O.object_id = P.major_id " +
-           "LEFT JOIN sys.types T ON T.user_type_id = P.major_id " +
-           "LEFT JOIN sys.schemas S ON S.schema_id = COALESCE(O.schema_id,T.schema_id) " +
-           "WHERE " +
-           "U.name = '" +
-           user +
-           "' AND COALESCE(S.name,'" +
-           database +
-           "') = '" +
-           securableSchema( database, permission ) +
-           "'";
+    return
+      "SELECT U.name as [user], P.class_desc as [type], P.permission_name as [permission], P.state_desc as [state], O.name as [object_name], S.name as [schema] " +
+      "FROM sys.database_permissions P " +
+      "JOIN sys.database_principals U ON P.grantee_principal_id = U.principal_id AND U.type_desc IN ('SQL_USER','WINDOWS_USER','WINDOWS_GROUP')" +
+      "LEFT JOIN sys.all_objects O ON O.object_id = P.major_id " +
+      "LEFT JOIN sys.types T ON T.user_type_id = P.major_id " +
+      "LEFT JOIN sys.schemas S ON S.schema_id = COALESCE(O.schema_id,T.schema_id) " +
+      "WHERE " +
+      "U.name = '" +
+      user +
+      "' AND COALESCE(S.name,'" +
+      database +
+      "') = '" +
+      securableSchema( database, permission ) +
+      "'";
+  }
+
+  protected String allDatabasePermissionsSQL()
+  {
+    return
+      "SELECT U.name as [user], P.class_desc as [type], P.permission_name as [permission], P.state_desc as [state], O.name as [object_name], S.name as [schema] " +
+      "FROM sys.database_permissions P " +
+      "JOIN sys.database_principals U ON P.grantee_principal_id = U.principal_id AND U.type_desc IN ('SQL_USER','WINDOWS_USER','WINDOWS_GROUP')" +
+      "LEFT JOIN sys.all_objects O ON O.object_id = P.major_id " +
+      "LEFT JOIN sys.types T ON T.user_type_id = P.major_id " +
+      "LEFT JOIN sys.schemas S ON S.schema_id = COALESCE(O.schema_id,T.schema_id) " +
+      "WHERE P.class_desc IN ('DATABASE','TYPE','OBJECT_OR_COLUMN') " +
+      "AND U.name != 'dbo'";
   }
 
   private void log( final String... s )

@@ -262,12 +262,13 @@ public class RunnerTest
   public void testPermissions()
     throws Exception
   {
-    final Login l = login( "login1", "pwd" );
+    final Login l1 = login( "login1", "pwd" );
+    final Login l2 = login( "login2", "pwd" );
     final Database db = database( "test_db1" );
-    cleanup( l );
+    cleanup( l1 );
     cleanup( db );
 
-    _runner.apply( sc( jLogins( jLogin( l ) ), jDatabases( jDatabase( db ) ) ) );
+    _runner.apply( sc( jLogins( jLogin( l1 ), jLogin( l2 ) ), jDatabases( jDatabase( db ) ) ) );
 
     _shell.execute( "USE test_db1; execute('create PROCEDURE aaa AS SELECT 1')" );
 
@@ -285,23 +286,23 @@ public class RunnerTest
                                                   a( "securable_type", PermissionSecurableType.OBJECT.toString() ),
                                                   a( "securable", "aaa" ) );
 
-    _runner.apply( sc( jLogins( jLogin( l ) ),
+    _runner.apply( sc( jLogins( jLogin( l1 ) ),
                        jDatabases( jDatabase( db.getName(), jUsers(
                          jUser( "user1", "login1",
                                 jPermissions( jPermission( grantBackupDB ),
                                               jPermission( grantExecuteAAA ),
-                                              jPermission( grantConnect ) ) ) ) ) ) ) );
-
-    final List<Map<String, Object>> permissions =
-      _shell.query( "USE [" + db.getName() + "];" + _runner.userPermissionsSQL( db.getName(), "user1", null ) );
-    System.out.println( permissions );
+                                              jPermission( grantConnect ) ) ),
+                         jUser( "user2", "login2",
+                                jPermissions( jPermission( grantExecuteAAA )
+                                ) ) ) ) ) ) );
 
     assertTrue( hasGrantedPermission( db.getName(), "user1", grantConnect ) );
     assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupDB ) );
     assertTrue( hasGrantedPermission( db.getName(), "user1", grantExecuteAAA ) );
+    assertTrue( hasGrantedPermission( db.getName(), "user2", grantExecuteAAA ) );
     assertFalse( hasPermission( db.getName(), "user1", grantBackupLog ) );
 
-    _runner.apply( sc( jLogins( jLogin( l ) ),
+    _runner.apply( sc( jLogins( jLogin( l1 ) ),
                        jDatabases( jDatabase( db.getName(), jUsers(
                          jUser( "user1", "login1",
                                 jPermissions( jPermission( grantConnect ),
@@ -309,13 +310,15 @@ public class RunnerTest
                                               jPermission( denyExecuteAAA ) ) ) ) ) ) ) );
 
     assertTrue( hasGrantedPermission( db.getName(), "user1", grantConnect ) );
-    assertFalse( hasPermission( db.getName(), "user1", grantBackupDB ) );  // Autocleaned
+    // Check permissions are not deleted in default configuration
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupDB ) );
     assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupLog ) );
     assertTrue( hasDeniedPermission( db.getName(), "user1", denyExecuteAAA ) );
     assertFalse( hasGrantedPermission( db.getName(), "user1", grantExecuteAAA ) );
+    assertTrue( hasGrantedPermission( db.getName(), "user2", grantExecuteAAA ) );
 
-    // TODO: add support for not cleaning permissions
-    _runner.apply( sc( jLogins( jLogin( l ) ),
+    // Test revoke
+    _runner.apply( sc( jLogins( jLogin( l1 ) ),
                        jDatabases( jDatabase( db.getName(), jUsers(
                          jUser( "user1", "login1",
                                 jPermissions(
@@ -326,19 +329,46 @@ public class RunnerTest
                                 ) ) ) ) ) ) );
 
     assertTrue( hasGrantedPermission( db.getName(), "user1", grantConnect ) );
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupDB ) );
     assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupLog ) );
     assertFalse( hasPermission( db.getName(), "user1", grantExecuteAAA ) );
     assertFalse( hasPermission( db.getName(), "user1", denyExecuteAAA ) );
+    assertTrue( hasGrantedPermission( db.getName(), "user2", grantExecuteAAA ) );
 
-    _runner.apply( sc( jLogins( jLogin( l ) ),
+    // Test that deletion of permissions works if database is 'managed'
+    _runner.apply( sc( jLogins( jLogin( l1 ) ),
+                       jDatabases( jDatabase( db.getName(), a( "managed", "true" ), jUsers(
+                         jUser( "user1", "login1",
+                                jPermissions( jPermission( grantConnect ),
+                                              jPermission( grantBackupLog ),
+                                              jPermission( denyExecuteAAA ) ) ) ) ) ) ) );
+
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantConnect ) );
+    assertFalse( hasPermission( db.getName(), "user1", grantBackupDB ) );
+    assertTrue( hasGrantedPermission( db.getName(), "user1", grantBackupLog ) );
+    assertTrue( hasDeniedPermission( db.getName(), "user1", denyExecuteAAA ) );
+    assertFalse( hasPermission( db.getName(), "user2", grantExecuteAAA ) );
+
+    // Test that deletion of permissions works if 'delete unmanaged permissions' is true and db is unmanaged
+    _runner.apply( sc( a( "delete_unmanaged_permissions", "true" ),
+                       jLogins( jLogin( l1 ) ),
                        jDatabases( jDatabase( db.getName(), jUsers(
                          jUser( "user1", "login1" ) ) ) ) ) );
 
+    assertFalse( hasPermission( db.getName(), "user1", grantConnect ) );
+    assertFalse( hasPermission( db.getName(), "user1", grantBackupLog ) );
+    assertFalse( hasPermission( db.getName(), "user1", denyExecuteAAA ) );
+
     Assert.assertEquals(
-      _shell.query( "USE [" + db.getName() + "];" + _runner.userPermissionsSQL( db.getName(), "user1", null ) ).size(), 0 );
+      _shell.query( "USE [" + db.getName() + "];" + _runner.userPermissionsSQL( db.getName(), "user1", null ) ).size(),
+      0 );
+
+    Assert.assertEquals(
+      _shell.query( "USE [" + db.getName() + "];" + _runner.userPermissionsSQL( db.getName(), "user2", null ) ).size(),
+      0 );
 
     cleanup( db );
-    cleanup( l );
+    cleanup( l1 );
   }
 
   private void cleanup( final Database... dbs )
@@ -448,12 +478,13 @@ public class RunnerTest
   }
 
   private boolean hasDeniedPermission( final String database,
-                                          final String user,
-                                          final Permission permission )
+                                       final String user,
+                                       final Permission permission )
     throws Exception
   {
     return _shell.query( "USE [" + database + "];" +
-      _runner.userHasPermissionSQL( database, user, permission, PermissionAction.DENY ) ).size() == 1;
+                         _runner.userHasPermissionSQL( database, user, permission, PermissionAction.DENY ) ).size() ==
+           1;
   }
 
   private boolean hasGrantedPermission( final String database,
@@ -462,7 +493,8 @@ public class RunnerTest
     throws Exception
   {
     return _shell.query( "USE [" + database + "];" +
-      _runner.userHasPermissionSQL( database, user, permission, PermissionAction.GRANT ) ).size() == 1;
+                         _runner.userHasPermissionSQL( database, user, permission, PermissionAction.GRANT ) ).size() ==
+           1;
   }
 
   private boolean hasPermission( final String database,
@@ -470,7 +502,7 @@ public class RunnerTest
                                  final Permission permission )
     throws Exception
   {
-    return hasGrantedPermission( database, user, permission) ||  hasDeniedPermission( database, user, permission);
+    return hasGrantedPermission( database, user, permission ) || hasDeniedPermission( database, user, permission );
   }
 
   private ServerConfig sc( final String... attributes )
