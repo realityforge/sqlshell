@@ -343,6 +343,7 @@ public class Runner
     }
 
     removeUnwantedUsers( db, config );
+    removeUnwantedDatabaseRoles( db, config );
     removeUnwantedPermissions( db, config );
   }
 
@@ -377,33 +378,6 @@ public class Runner
       }
     }
 
-    // Remove unwanted roles
-    final List<Map<String, Object>> existingRoles = _shell.query( userRolesSQL( db.getName(), user.getName() ) );
-    for ( final Map<String, Object> existingRole : existingRoles )
-    {
-      final String existingRoleName = (String) existingRole.get( "role" );
-      if ( null == user.getRoles() )
-      {
-        removeUserRole( db, user, existingRoleName );
-      }
-      else
-      {
-        boolean keep = false;
-        for ( final String role : user.getRoles() )
-        {
-          if ( existingRoleName.equalsIgnoreCase( role ) )
-          {
-            keep = true;
-            break;
-          }
-        }
-        if ( !keep )
-        {
-          removeUserRole( db, user, existingRoleName );
-        }
-      }
-    }
-
     // Process permissions
     if ( null != user.getPermissions() )
     {
@@ -426,7 +400,7 @@ public class Runner
     final List<Map<String, Object>>
       existingUsers = _shell.query( "USE [" + db.getName() + "]; " + allDatabaseUsersSQL() );
 
-    final Set<String> wantedUsers = new HashSet<>(  );
+    final Set<String> wantedUsers = new HashSet<>();
     if ( null != db.getUsers() )
     {
       for ( final User user : db.getUsers() )
@@ -451,6 +425,44 @@ public class Runner
   {
     log( "Dropping user " + db.getName() + "::" + userName );
     _shell.execute( "USE [" + db.getName() + "]; DROP USER [" + userName + "]" );
+  }
+
+  private void removeUnwantedDatabaseRoles( final Database db, final ServerConfig config )
+    throws Exception
+  {
+    if ( !Boolean.TRUE.equals( db.isManaged() ) && !Boolean.TRUE.equals( config.isDeleteUnmanagedDatabaseRoles() ) )
+    {
+      return;
+    }
+
+    final List<Map<String, Object>> existingRoles =
+      _shell.query( "USE [" + db.getName() + "]; " + allDatabaseRolesSQL( ) );
+
+    // Collect all permissions that should exist and store against user name
+    final Map<String, List<String>> wantedRoles = new HashMap<>();
+    if ( null != db.getUsers() )
+    {
+      for ( final User user : db.getUsers() )
+      {
+        final List<String> userRoles = user.getRoles();
+        if ( null == userRoles || userRoles.size() == 0 )
+        {
+          continue;
+        }
+        wantedRoles.put( user.getName().toLowerCase(), userRoles );
+      }
+    }
+
+    for ( final Map<String, Object> existingRoleRow : existingRoles )
+    {
+      final String userName = (String) existingRoleRow.get( "user" );
+      final String roleName = (String) existingRoleRow.get( "role" );
+
+      if ( !wantedRoles.containsKey( userName ) || !wantedRoles.get( userName ).contains( roleName ) )
+      {
+        removeUserRole( db, userName, roleName );
+      }
+    }
   }
 
   private void removeUnwantedPermissions( final Database db, final ServerConfig config )
@@ -593,13 +605,13 @@ public class Runner
     }
   }
 
-  private void removeUserRole( final Database db, final User user, final String role )
+  private void removeUserRole( final Database db, final String user, final String role )
     throws Exception
   {
-    log( "Removing role " + role + " from user " + user.getName() + " in database " + db.getName() );
+    log( "Removing role " + role + " from user " + user + " in database " + db.getName() );
 
     _shell.executeUpdate(
-      "USE [" + db.getName() + "]; EXEC sys.sp_droprolemember [" + role + "], [" + user.getName() + "]" );
+      "USE [" + db.getName() + "]; EXEC sys.sp_droprolemember [" + role + "], [" + user + "]" );
   }
 
   private void ensurePermission( final Database db, final User user, final Permission permission )
@@ -771,6 +783,19 @@ public class Runner
       "AND U.name != 'dbo'";
   }
 
+  private String allDatabaseRolesSQL()
+  {
+    return
+      "SELECT U.name AS [user], R.name AS [role] " +
+      "FROM " +
+      "sys.database_principals R " +
+      "JOIN sys.database_role_members RM ON RM.role_principal_id = R.principal_id " +
+      "JOIN sys.database_principals U ON RM.member_principal_id = U.principal_id " +
+      "WHERE " +
+      "R.is_fixed_role = 1 AND " +
+      "U.name != 'dbo'";
+  }
+
   private String allDatabaseUsersSQL()
   {
     return "SELECT U.name AS [user] " +
@@ -780,6 +805,7 @@ public class Runner
            "U.name != 'dbo' AND " +
            "U.type_desc IN ('SQL_USER','WINDOWS_USER','WINDOWS_GROUP')";
   }
+
   private void log( final String... s )
   {
     System.out.println( join( null, s ) );

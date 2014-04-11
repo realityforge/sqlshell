@@ -283,21 +283,43 @@ public class RunnerTest
 
     _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ) ),
                        jDatabases( jDatabase( db.getName(), jUsers(
-                         jUser( "user1", "login1", a( "roles", "[\"db_datareader\",\"db_datawriter\"]" ) ) ) ) ) ) );
+                         jUser( "user1", "login1", a( "roles", "[\"db_datareader\",\"db_datawriter\"]" ) ),
+                         jUser( "user2", "login2", a( "roles", "[\"db_datareader\",\"db_datawriter\"]" ) ) ) ) ) ) );
 
     assertUserMatch( db.getName(), "login1", "user1" );
     assertTrue( hasDatabaseRole( db.getName(), "user1", "db_datareader" ) );
     assertTrue( hasDatabaseRole( db.getName(), "user1", "db_datawriter" ) );
+    assertTrue( hasDatabaseRole( db.getName(), "user2", "db_datareader" ) );
+    assertTrue( hasDatabaseRole( db.getName(), "user2", "db_datawriter" ) );
     assertFalse( hasDatabaseRole( db.getName(), "user1", "db_ddladmin" ) );
 
     _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ) ),
                        jDatabases( jDatabase( db.getName(), jUsers(
-                         jUser( "user1", "login2", a( "roles", "[\"db_datareader\",\"db_ddladmin\"]" ) ) ) ) ) ) );
+                         jUser( "user1", "login1", a( "roles", "[\"db_datareader\",\"db_ddladmin\"]" ) ) ) ) ) ) );
 
-    assertUserMatch( db.getName(), "login2", "user1" );
+    assertTrue( hasDatabaseRole( db.getName(), "user1", "db_datareader" ) );
+    assertTrue( hasDatabaseRole( db.getName(), "user1", "db_datawriter" ) ); // Shouldn't delete if not told to
+    assertTrue( hasDatabaseRole( db.getName(), "user2", "db_datareader" ) );
+    assertTrue( hasDatabaseRole( db.getName(), "user2", "db_datawriter" ) );
+    assertTrue( hasDatabaseRole( db.getName(), "user1", "db_ddladmin" ) );
+
+    _runner.apply( sc( a( "delete_unmanaged_database_roles", "true" ),
+                       jLogins( jLogin( l ), jLogin( l2 ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login1", a( "roles", "[\"db_datareader\",\"db_ddladmin\"]" ) ) ) ) ) ) );
+
     assertTrue( hasDatabaseRole( db.getName(), "user1", "db_datareader" ) );
     assertFalse( hasDatabaseRole( db.getName(), "user1", "db_datawriter" ) );
     assertTrue( hasDatabaseRole( db.getName(), "user1", "db_ddladmin" ) );
+    assertFalse( hasDatabaseRole( db.getName(), "user2", "db_datareader" ) );
+    assertFalse( hasDatabaseRole( db.getName(), "user2", "db_datawriter" ) );
+
+    _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ) ),
+                       jDatabases(
+                         jDatabase( db.getName(), a( "managed", "true" ), jUsers( jUser( "user1", "login1" ) ) ) ) ) );
+
+    assertFalse( hasDatabaseRole( db.getName(), "user1", "db_datareader" ) );
+    assertFalse( hasDatabaseRole( db.getName(), "user1", "db_ddladmin" ) );
 
     cleanup( db );
     cleanup( l, l2 );
