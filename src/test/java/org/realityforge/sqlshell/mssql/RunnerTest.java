@@ -158,7 +158,7 @@ public class RunnerTest
   }
 
   @Test
-  public void testAddDatabase()
+  public void addDatabase()
     throws Exception
   {
     final Database db = database( "test_db1",
@@ -174,7 +174,7 @@ public class RunnerTest
   }
 
   @Test
-  public void testCleanupDatabases()
+  public void cleanupDatabases()
     throws Exception
   {
     final Database db1 = database( "test_db1" );
@@ -206,7 +206,7 @@ public class RunnerTest
   }
 
   @Test
-  public void testUpdateDatabase()
+  public void updateDatabase()
     throws Exception
   {
     final Database db = database( "test_db1",
@@ -228,7 +228,7 @@ public class RunnerTest
   }
 
   @Test
-  public void testUsers()
+  public void userManagement()
     throws Exception
   {
     final Login l = login( "login1", "pwd" );
@@ -272,7 +272,7 @@ public class RunnerTest
   }
 
   @Test
-  public void testDatabaseRoles()
+  public void databaseRoleManagement()
     throws Exception
   {
     final Login l = login( "login1", "pwd" );
@@ -326,7 +326,7 @@ public class RunnerTest
   }
 
   @Test
-  public void testPermissions()
+  public void permissionsManagement()
     throws Exception
   {
     final Login l1 = login( "login1", "pwd" );
