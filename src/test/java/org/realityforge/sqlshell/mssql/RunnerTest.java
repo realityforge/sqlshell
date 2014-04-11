@@ -17,6 +17,7 @@ import org.realityforge.sqlshell.data_type.mssql.PermissionAction;
 import org.realityforge.sqlshell.data_type.mssql.PermissionPermission;
 import org.realityforge.sqlshell.data_type.mssql.PermissionSecurableType;
 import org.realityforge.sqlshell.data_type.mssql.ServerConfig;
+import org.realityforge.sqlshell.data_type.mssql.User;
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -232,6 +233,50 @@ public class RunnerTest
   {
     final Login l = login( "login1", "pwd" );
     final Login l2 = login( "login2", "pwd" );
+    final Login l3 = login( "login3", "pwd" );
+    final Database db = database( "test_db1" );
+    cleanup( l, l2, l3 );
+    cleanup( db );
+
+    // Basic creation
+    final User user2 = user( "user2", "login2" );
+    _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ), jLogin( l3 ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login1" ), jUser( user2 ) ) ) ) ) );
+
+    assertUserMatch( db.getName(), "login1", "user1" );
+    assertUserMatch( db.getName(), "login2", "user2" );
+
+    _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ), jLogin( l3 ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login3" ) ) ) ) ) );
+
+    assertUserMatch( db.getName(), "login3", "user1" );
+    assertUserMatch( db.getName(), "login2", "user2" ); // Should not autodelete
+
+    // Should delete if 'delete unmanaged users' is true
+    _runner.apply( sc( a( "delete_unmanaged_users", "true" ),
+                       jLogins( jLogin( l ), jLogin( l2 ), jLogin( l3 ) ),
+                       jDatabases( jDatabase( db.getName(), jUsers(
+                         jUser( "user1", "login3" ) ) ) ) ) );
+    assertUserMatch( db.getName(), "login3", "user1" );
+    assertFalse( _runner.userExists( db, user2 ) );
+
+    // should delete if database is managed
+    _runner.apply( sc( jLogins( jLogin( l ), jLogin( l2 ), jLogin( l3 ) ),
+                       jDatabases( jDatabase( db.getName(), a( "managed", "true" ) ) ) ) );
+    assertFalse( _runner.userExists( db, user( "user1", "login3" ) ) );
+
+    cleanup( db );
+    cleanup( l, l2, l3 );
+  }
+
+  @Test
+  public void testDatabaseRoles()
+    throws Exception
+  {
+    final Login l = login( "login1", "pwd" );
+    final Login l2 = login( "login2", "pwd" );
     final Database db = database( "test_db1" );
     cleanup( l, l2 );
     cleanup( db );
@@ -265,7 +310,7 @@ public class RunnerTest
     final Login l1 = login( "login1", "pwd" );
     final Login l2 = login( "login2", "pwd" );
     final Database db = database( "test_db1" );
-    cleanup( l1 );
+    cleanup( l1, l2 );
     cleanup( db );
 
     _runner.apply( sc( jLogins( jLogin( l1 ), jLogin( l2 ) ), jDatabases( jDatabase( db ) ) ) );
@@ -368,7 +413,7 @@ public class RunnerTest
       0 );
 
     cleanup( db );
-    cleanup( l1 );
+    cleanup( l1, l2 );
   }
 
   private void cleanup( final Database... dbs )
@@ -523,6 +568,12 @@ public class RunnerTest
     return _objectMapper.readValue( jLogin( name, password, extras ), Login.class );
   }
 
+  private User user( final String name, final String login, final String... extras )
+    throws IOException
+  {
+    return _objectMapper.readValue( jUser( name, login, extras ), User.class );
+  }
+
   private Permission permission( final String... attributes )
     throws IOException
   {
@@ -565,6 +616,12 @@ public class RunnerTest
     throws IOException
   {
     return _objectMapper.writeValueAsString( db );
+  }
+
+  private String jUser( final User user )
+    throws IOException
+  {
+    return _objectMapper.writeValueAsString( user );
   }
 
   private String jLogin( final Login login )

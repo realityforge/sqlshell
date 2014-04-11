@@ -3,8 +3,10 @@ package org.realityforge.sqlshell.mssql;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.realityforge.sqlshell.SqlShell;
 import org.realityforge.sqlshell.data_type.mssql.Database;
 import org.realityforge.sqlshell.data_type.mssql.Login;
@@ -340,9 +342,7 @@ public class Runner
       }
     }
 
-    // TODO: Remove unwanted users
-
-    // Remove unwanted permissions
+    removeUnwantedUsers( db, config );
     removeUnwantedPermissions( db, config );
   }
 
@@ -412,6 +412,45 @@ public class Runner
         ensurePermission( db, user, permission );
       }
     }
+  }
+
+  private void removeUnwantedUsers( final Database db, final ServerConfig config )
+    throws Exception
+  {
+    if ( !Boolean.TRUE.equals( db.isManaged() ) && !Boolean.TRUE.equals( config.isDeleteUnmanagedUsers() ) )
+    {
+      return;
+    }
+
+    // Obtain list of users in the database
+    final List<Map<String, Object>>
+      existingUsers = _shell.query( "USE [" + db.getName() + "]; " + allDatabaseUsersSQL() );
+
+    final Set<String> wantedUsers = new HashSet<>(  );
+    if ( null != db.getUsers() )
+    {
+      for ( final User user : db.getUsers() )
+      {
+        wantedUsers.add( user.getName().toLowerCase() );
+      }
+    }
+
+    for ( final Map<String, Object> existingUserRow : existingUsers )
+    {
+      final String userName = (String) existingUserRow.get( "user" );
+
+      if ( !wantedUsers.contains( userName.toLowerCase() ) )
+      {
+        removeUser( db, userName );
+      }
+    }
+  }
+
+  private void removeUser( final Database db, final String userName )
+    throws Exception
+  {
+    log( "Dropping user " + db.getName() + "::" + userName );
+    _shell.execute( "USE [" + db.getName() + "]; DROP USER [" + userName + "]" );
   }
 
   private void removeUnwantedPermissions( final Database db, final ServerConfig config )
@@ -719,7 +758,7 @@ public class Runner
       "'";
   }
 
-  protected String allDatabasePermissionsSQL()
+  private String allDatabasePermissionsSQL()
   {
     return
       "SELECT U.name as [user], P.class_desc as [type], P.permission_name as [permission], P.state_desc as [state], O.name as [object_name], S.name as [schema] " +
@@ -732,6 +771,15 @@ public class Runner
       "AND U.name != 'dbo'";
   }
 
+  private String allDatabaseUsersSQL()
+  {
+    return "SELECT U.name AS [user] " +
+           "FROM sys.database_principals U " +
+           "JOIN sys.server_principals SP ON SP.sid = U.sid AND SP.is_disabled = 0 AND SP.name NOT LIKE 'NT AUTHORITY%' AND SP.name NOT LIKE 'NT SERVICE%' " +
+           "WHERE " +
+           "U.name != 'dbo' AND " +
+           "U.type_desc IN ('SQL_USER','WINDOWS_USER','WINDOWS_GROUP')";
+  }
   private void log( final String... s )
   {
     System.out.println( join( null, s ) );
