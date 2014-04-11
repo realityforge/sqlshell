@@ -48,81 +48,22 @@ public class RunnerTest
   }
 
   @Test
-  public void loginCreate()
+  public void loginManagement()
     throws Exception
   {
-    final Login login = login( "login1", "pwd", a( "server_roles", "[\"" + LoginServerRole.SYSADMIN + "\",\"" +
-                                                                   LoginServerRole.DBCREATOR + "\"]" ) );
+    final Login login = login( "login1", "pwd" );
     cleanup( login );
 
     _runner.apply( sc( jLogins( jLogin( login ) ), jDatabases() ) );
-
     assertTrue( _runner.loginExists( login ) );
-
     assertPasswordMatch( login.getName(), login.getPassword() );
-    assertTrue( hasServerRole( login.getName(), LoginServerRole.SYSADMIN ) );
-    assertTrue( hasServerRole( login.getName(), LoginServerRole.DBCREATOR ) );
 
-    _runner.removeLogin( login );
-    assertFalse( _runner.loginExists( login ) );
-  }
-
-  @Test
-  public void loginUpdate()
-    throws Exception
-  {
-    final Login login = login( "login1", "pwd", a( "server_roles", "[\"" + LoginServerRole.BULKADMIN + "\",\"" +
-                                                                   LoginServerRole.DBCREATOR + "\"]" ) );
-    cleanup( login );
-
-    _runner.apply( sc( jLogins( jLogin( login ) ), jDatabases() ) );
-
-    assertTrue( hasServerRole( login.getName(), LoginServerRole.BULKADMIN ) );
-    assertTrue( hasServerRole( login.getName(), LoginServerRole.DBCREATOR ) );
-
-    _runner.apply( sc( jLogins( jLogin( login.getName(), "newPwd",
-                                        a( "server_roles", "[\"" + LoginServerRole.SYSADMIN + "\",\"" +
-                                                           LoginServerRole.DBCREATOR + "\"]" ) ) ), jDatabases() ) );
-
-    assertTrue( hasServerRole( login.getName(), LoginServerRole.SYSADMIN ) );
-    assertTrue( hasServerRole( login.getName(), LoginServerRole.DBCREATOR ) );
-    assertFalse( hasServerRole( login.getName(), LoginServerRole.BULKADMIN ) );
-
+    _runner.apply( sc( jLogins( jLogin( login.getName(), "newPwd" ) ), jDatabases() ) );
     assertTrue( _runner.loginExists( login ) );
     assertPasswordMatch( login.getName(), "newPwd" );
 
-    cleanup( login );
-  }
-
-  @Test
-  public void getLogins()
-    throws Exception
-  {
-    final Login login1 = login( "login1", "pwd" );
-    final Login login2 = login( "login2", "pwd" );
-    cleanup( login1, login2 );
-
-    _runner.apply( sc( jLogins( jLogin( login1 ), jLogin( login2 ) ), jDatabases() ) );
-
-    assertTrue( _runner.loginExists( login1 ) );
-    assertTrue( _runner.loginExists( login2 ) );
-
-    final List<String> existingLogins = _runner.getLogins();
-    boolean found1 = false, found2 = false;
-    for ( final String existingLogin : existingLogins )
-    {
-      if ( existingLogin.equals( login1.getName() ) )
-      {
-        found1 = true;
-      }
-      if ( existingLogin.equals( login2.getName() ) )
-      {
-        found2 = true;
-      }
-    }
-    assertTrue( found1 );
-    assertTrue( found2 );
-    cleanup( login1, login2 );
+    _runner.removeLogin( login );
+    assertFalse( _runner.loginExists( login ) );
   }
 
   @Test
@@ -158,18 +99,78 @@ public class RunnerTest
   }
 
   @Test
-  public void addDatabase()
+  public void serverRoleManagement()
+    throws Exception
+  {
+    final Login l1 = login( "login1", "pwd" );
+    final Login l2 = login( "login2", "pwd" );
+
+    cleanup( l1, l2 );
+
+    _runner.apply( sc( jDatabases(),
+                       jLogins( jLogin( l1.getName(), "pwd",
+                                        a( "server_roles", "[\"" +
+                                                           LoginServerRole.BULKADMIN + "\",\"" +
+                                                           LoginServerRole.SYSADMIN + "\",\"" +
+                                                           LoginServerRole.DBCREATOR + "\"]" ) ),
+                                jLogin( l2.getName(), "pwd",
+                                        a( "server_roles", "[\"" + LoginServerRole.BULKADMIN + "\"]" ) ) ) ) );
+
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.BULKADMIN ) );
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.SYSADMIN ) );
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.DBCREATOR ) );
+    assertTrue( hasServerRole( l2.getName(), LoginServerRole.BULKADMIN ) );
+
+    _runner.apply( sc( jDatabases(),
+                       jLogins( jLogin( l1.getName(), "pwd",
+                                        a( "server_roles", "[\"" +
+                                                           LoginServerRole.SYSADMIN + "\",\"" +
+                                                           LoginServerRole.DISKADMIN + "\"]" ) ) ) ) );
+
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.BULKADMIN ) );
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.SYSADMIN ) );
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.DBCREATOR ) );
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.DISKADMIN ) );
+    assertTrue( hasServerRole( l2.getName(), LoginServerRole.BULKADMIN ) );
+
+    _runner.apply( sc( a( "delete_unmanaged_server_roles", "true" ),
+                       jDatabases(),
+                       jLogins( jLogin( l1.getName(), "pwd",
+                                        a( "server_roles", "[\"" +
+                                                           LoginServerRole.PROCESSADMIN + "\",\"" +
+                                                           LoginServerRole.DISKADMIN + "\"]" ) ) ) ) );
+
+    assertFalse( hasServerRole( l1.getName(), LoginServerRole.BULKADMIN ) );
+    assertFalse( hasServerRole( l1.getName(), LoginServerRole.SYSADMIN ) );
+    assertFalse( hasServerRole( l1.getName(), LoginServerRole.DBCREATOR ) );
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.PROCESSADMIN ) );
+    assertTrue( hasServerRole( l1.getName(), LoginServerRole.DISKADMIN ) );
+    assertFalse( hasServerRole( l2.getName(), LoginServerRole.BULKADMIN ) );
+
+    cleanup( l1, l2 );
+  }
+
+  @Test
+  public void databaseManagement()
     throws Exception
   {
     final Database db = database( "test_db1",
                                   a( "collation", "SQL_Latin1_General_CP1_CS_AS" ),
                                   a( "recovery_model", DatabaseRecoveryModel.FULL.name() ) );
     cleanup( db );
-    assertTrue( !_runner.databaseExists( db ) );
+
     _runner.apply( sc( jLogins(), jDatabases( jDatabase( db ) ) ) );
     assertTrue( _runner.databaseExists( db ) );
     assertRecoveryModel( db, DatabaseRecoveryModel.FULL.name() );
     assertCollation( db, "SQL_Latin1_General_CP1_CS_AS" );
+
+    _runner.apply( sc( jLogins(),
+                       jDatabases( jDatabase( db.getName(),
+                                              a( "collation", "SQL_Latin1_General_CP1_CI_AS" ),
+                                              a( "recovery_model", DatabaseRecoveryModel.SIMPLE.name() ) ) ) ) );
+    assertRecoveryModel( db, DatabaseRecoveryModel.SIMPLE.name() );
+    assertCollation( db, "SQL_Latin1_General_CP1_CI_AS" );
+
     cleanup( db );
   }
 
@@ -203,28 +204,6 @@ public class RunnerTest
     assertFalse( _runner.databaseExists( db2 ) );
 
     cleanup( db1 );
-  }
-
-  @Test
-  public void updateDatabase()
-    throws Exception
-  {
-    final Database db = database( "test_db1",
-                                  a( "collation", "SQL_Latin1_General_CP1_CS_AS" ),
-                                  a( "recovery_model", DatabaseRecoveryModel.FULL.name() ) );
-    cleanup( db );
-
-    _runner.apply( sc( jLogins(), jDatabases( jDatabase( db ) ) ) );
-    assertRecoveryModel( db, DatabaseRecoveryModel.FULL.name() );
-    assertCollation( db, "SQL_Latin1_General_CP1_CS_AS" );
-
-    _runner.apply( sc( jLogins(), jDatabases( jDatabase( "test_db1",
-                                                         a( "collation", "SQL_Latin1_General_CP1_CI_AS" ),
-                                                         a( "recovery_model",
-                                                            DatabaseRecoveryModel.SIMPLE.name() ) ) ) ) );
-    assertRecoveryModel( db, DatabaseRecoveryModel.SIMPLE.name() );
-    assertCollation( db, "SQL_Latin1_General_CP1_CI_AS" );
-    cleanup( db );
   }
 
   @Test

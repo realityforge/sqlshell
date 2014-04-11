@@ -43,7 +43,51 @@ public class Runner
       updateLogin( login );
     }
 
-    // Remove any unwanted ones
+    // Create all required databases
+    for ( final Database db : config.getDatabases() )
+    {
+      if ( !SYS_DATABASES.contains( db.getName() ) )
+      {
+        if ( !databaseExists( db ) )
+        {
+          createDatabase( db );
+        }
+        alterDatabase( db, config );
+      }
+    }
+
+    removeUnwantedDatabases( config );
+    removeUnwantedServerRoles( config );
+    removeUnwantedLogins( config );
+  }
+
+  private void removeUnwantedDatabases( final ServerConfig config )
+    throws Exception
+  {
+    if ( Boolean.TRUE.equals( config.isDeleteUnmanagedDatabases() ) )
+    {
+      for ( final Database existingDb : getDatabases() )
+      {
+        boolean keep = false;
+        for ( final Database db : config.getDatabases() )
+        {
+          if ( db.getName().equals( existingDb.getName() ) )
+          {
+            keep = true;
+            break;
+          }
+        }
+        if ( !keep )
+        {
+          dropDatabase( existingDb );
+        }
+      }
+    }
+  }
+
+  private void removeUnwantedLogins( final ServerConfig config )
+    throws Exception
+  {
     if ( Boolean.TRUE.equals( config.isDeleteUnmanagedLogins() ) )
     {
       for ( final String existingLogin : getLogins() )
@@ -63,37 +107,43 @@ public class Runner
         }
       }
     }
+  }
 
-    // Create all required databases
-    for ( final Database db : config.getDatabases() )
+  private void removeUnwantedServerRoles( final ServerConfig config )
+    throws Exception
+  {
+    if ( !Boolean.TRUE.equals( config.isDeleteUnmanagedServerRoles() ) )
     {
-      if ( !SYS_DATABASES.contains( db.getName() ) )
-      {
-        if ( !databaseExists( db ) )
-        {
-          createDatabase( db );
-        }
-        alterDatabase( db, config );
-      }
+      return;
     }
 
-    if ( Boolean.TRUE.equals( config.isDeleteUnmanagedDatabases() ) )
+    // Collect all roles that should exist and store against login name
+    final Map<String, List<LoginServerRole>> wantedRoles = new HashMap<>();
+    for ( final Login login : config.getLogins() )
     {
-      for ( final Database existingDb : getDatabases() )
+      final List<LoginServerRole> loginRoles = login.getServerRoles();
+      if ( null == loginRoles || loginRoles.size() == 0 )
       {
-        boolean keep = false;
-        for ( final Database db : config.getDatabases() )
-        {
-          if ( db.getName().equals( existingDb.getName() ) )
-          {
-            keep = true;
-            break;
-          }
-        }
-        if ( !keep )
-        {
-          dropDatabase( existingDb );
-        }
+        continue;
+      }
+      wantedRoles.put( login.getName().toLowerCase(), loginRoles );
+    }
+
+    final List<Map<String, Object>> existingRoles = _shell.query( allServerRolesSQL() );
+    for ( final Map<String, Object> existingRoleRow : existingRoles )
+    {
+      final String login = (String) existingRoleRow.get( "login" );
+      final String roleName = (String) existingRoleRow.get( "role" );
+
+      if ( "sa".equalsIgnoreCase( login ) || login.equalsIgnoreCase( (String)_shell.getDbProperties().get("user") ) )
+      {
+        continue;
+      }
+
+      if ( !wantedRoles.containsKey( login ) ||
+           !wantedRoles.get( login ).contains( LoginServerRole.valueOf( roleName.toUpperCase() ) ) )
+      {
+        removeLoginRole( login, roleName );
       }
     }
   }
@@ -161,42 +211,15 @@ public class Runner
         ensureLoginRole( login.getName(), loginServerRole );
       }
     }
-
-    // Remove unwanted server roles
-    final List<Map<String, Object>> serverRoles = _shell.query( loginServerRolesSQL( login.getName() ) );
-    for ( final Map<String, Object> serverRole : serverRoles )
-    {
-      final String role = (String) serverRole.get( "name" );
-      if ( null == login.getServerRoles() )
-      {
-        removeLoginRole( login, role );
-      }
-      else
-      {
-        boolean keep = false;
-        for ( final LoginServerRole loginServerRole : login.getServerRoles() )
-        {
-          if ( role.equalsIgnoreCase( loginServerRole.toString() ) )
-          {
-            keep = true;
-            break;
-          }
-        }
-        if ( !keep )
-        {
-          removeLoginRole( login, role );
-        }
-      }
-    }
   }
 
-  private void removeLoginRole( final Login login, final String role )
+  private void removeLoginRole( final String login, final String role )
     throws Exception
   {
-    log( "Removing role " + role + " from " + login.getName() );
+    log( "Removing role " + role + " from " + login );
 
     _shell.execute(
-      "EXEC sys.sp_dropsrvrolemember @loginame = N'" + login.getName() + "', @rolename = N'" + role + "'" );
+      "EXEC sys.sp_dropsrvrolemember @loginame = N'" + login + "', @rolename = N'" + role + "'" );
   }
 
   private void ensureLoginRole( final String loginName, final LoginServerRole role )
@@ -436,7 +459,7 @@ public class Runner
     }
 
     final List<Map<String, Object>> existingRoles =
-      _shell.query( "USE [" + db.getName() + "]; " + allDatabaseRolesSQL( ) );
+      _shell.query( "USE [" + db.getName() + "]; " + allDatabaseRolesSQL() );
 
     // Collect all permissions that should exist and store against user name
     final Map<String, List<String>> wantedRoles = new HashMap<>();
@@ -768,6 +791,20 @@ public class Runner
       "') = '" +
       securableSchema( database, permission ) +
       "'";
+  }
+
+  private String allServerRolesSQL()
+  {
+    return "SELECT P.name as login, RP.name as role " +
+           "FROM " +
+           "sys.server_principals P " +
+           "JOIN sys.server_role_members SRM ON SRM.member_principal_id = P.principal_id " +
+           "JOIN sys.server_principals RP ON RP.principal_id = SRM.role_principal_id AND RP.type_desc = 'SERVER_ROLE' " +
+           "WHERE " +
+           "P.is_disabled = 0 AND " +
+           "P.name NOT LIKE 'NT AUTHORITY\\\\%' AND " +
+           "P.name NOT LIKE 'NT SERVICE\\\\%' AND " +
+           "P.type_desc IN ('SQL_LOGIN', 'WINDOWS_GROUP', 'WINDOWS_LOGIN')";
   }
 
   private String allDatabasePermissionsSQL()
