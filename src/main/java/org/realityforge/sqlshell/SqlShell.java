@@ -111,7 +111,7 @@ public final class SqlShell
     throws SQLException
   {
     final Connection connection = _driver.connect( _database, _dbProperties );
-    if( null == connection )
+    if ( null == connection )
     {
       throw new IllegalStateException( "Driver does not match jdbc url" );
     }
