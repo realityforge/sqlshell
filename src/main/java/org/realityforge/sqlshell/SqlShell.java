@@ -46,8 +46,7 @@ public final class SqlShell
   public Result execute( final String sql )
     throws Exception
   {
-    final Connection connection = getConnection();
-    try
+    try (final Connection connection = getConnection())
     {
       final Statement statement = connection.createStatement();
       final boolean returnsResultSet = statement.execute( sql );
@@ -60,17 +59,12 @@ public final class SqlShell
         return new Result( null, statement.getUpdateCount() );
       }
     }
-    finally
-    {
-      connection.close();
-    }
   }
 
   public List<Map<String, Object>> query( final String sql )
     throws Exception
   {
-    final Connection connection = getConnection();
-    try
+    try (final Connection connection = getConnection())
     {
       final Statement statement = connection.createStatement();
       final boolean returnsResultSet = statement.execute( sql );
@@ -80,26 +74,17 @@ public final class SqlShell
       }
       else
       {
-        return new ArrayList<Map<String, Object>>();
+        return new ArrayList<>();
       }
-    }
-    finally
-    {
-      connection.close();
     }
   }
 
   public int executeUpdate( final String sql )
     throws Exception
   {
-    final Connection connection = getConnection();
-    try
+    try (final Connection connection = getConnection())
     {
       return connection.createStatement().executeUpdate( sql );
-    }
-    finally
-    {
-      connection.close();
     }
   }
 
@@ -108,10 +93,10 @@ public final class SqlShell
   {
     final ResultSetMetaData md = resultSet.getMetaData();
     final int columns = md.getColumnCount();
-    final ArrayList<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+    final ArrayList<Map<String, Object>> list = new ArrayList<>();
     while ( resultSet.next() )
     {
-      final HashMap<String, Object> row = new HashMap<String, Object>();
+      final HashMap<String, Object> row = new HashMap<>();
       for ( int i = 1; i <= columns; ++i )
       {
         row.put( md.getColumnName( i ), resultSet.getObject( i ) );
