@@ -23,6 +23,7 @@ public class Runner
   private final SqlShell _shell;
 
   private List<String> SYS_DATABASES = Arrays.asList( "master", "msdb", "model", "tempdb" );
+  private List<String> SYS_USERS = Arrays.asList( "sa" );
 
   public Runner( final SqlShell shell )
   {
@@ -135,7 +136,8 @@ public class Runner
       final String login = (String) existingRoleRow.get( "login" );
       final String roleName = (String) existingRoleRow.get( "role" );
 
-      if ( "sa".equalsIgnoreCase( login ) || login.equalsIgnoreCase( (String)_shell.getDbProperties().get("user") ) )
+      if ( SYS_USERS.contains( login.toLowerCase() ) ||
+           login.equalsIgnoreCase( (String)_shell.getDbProperties().get("user") ) )
       {
         continue;
       }

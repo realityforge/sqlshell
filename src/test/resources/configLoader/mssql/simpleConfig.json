@@ -1,0 +1,16 @@
+{
+  "databases": [
+    {
+      "name": "testdb1"
+    },
+    {
+      "name": "testdb2"
+    }
+  ],
+  "logins": [
+    {
+      "name": "user1",
+      "password": "foo"
+    }
+  ]
+}

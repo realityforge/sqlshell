@@ -1,34 +1,32 @@
 package org.realityforge.sqlshell;
 
 import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.sql.Driver;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.realityforge.getopt4j.CLArgsParser;
 import org.realityforge.getopt4j.CLOption;
 import org.realityforge.getopt4j.CLOptionDescriptor;
 import org.realityforge.getopt4j.CLUtil;
+import org.realityforge.sqlshell.data_type.mssql.ServerConfig;
+import org.realityforge.sqlshell.mssql.Runner;
 
 /**
- * The entry point in which to run the tool.
+ * The entry point in which applies a configuration to a database server.
  */
-public class Main
+public class ConfigLoader
 {
   private static final int HELP_OPT = 1;
   private static final int QUIET_OPT = 'q';
   private static final int VERBOSE_OPT = 'v';
   private static final int DATABASE_DRIVER_OPT = 2;
   private static final int DATABASE_PROPERTY_OPT = 'D';
-  private static final int SQL_FILE_OPT = 'f';
+  private static final int DATABASE_DIALECT_OPT = 'd';
+  private static final int FILE_OPT = 'f';
 
   private static final CLOptionDescriptor[] OPTIONS = new CLOptionDescriptor[]{
     new CLOptionDescriptor( "database-driver",
@@ -39,10 +37,14 @@ public class Main
                             CLOptionDescriptor.ARGUMENTS_REQUIRED_2 | CLOptionDescriptor.DUPLICATES_ALLOWED,
                             DATABASE_PROPERTY_OPT,
                             "A jdbc property." ),
+    new CLOptionDescriptor( "dialect",
+                            CLOptionDescriptor.ARGUMENT_REQUIRED,
+                            DATABASE_DIALECT_OPT,
+                            "Database dialect.  Currently only 'mssql' supported" ),
     new CLOptionDescriptor( "file",
                             CLOptionDescriptor.ARGUMENT_REQUIRED,
-                            SQL_FILE_OPT,
-                            "A file containing sql commands." ),
+                            FILE_OPT,
+                            "A file containing a JSON configuration for the database." ),
     new CLOptionDescriptor( "help",
                             CLOptionDescriptor.ARGUMENT_DISALLOWED,
                             HELP_OPT,
@@ -66,9 +68,8 @@ public class Main
   private static String c_databaseDriver;
   private static final SqlShell c_shell = new SqlShell();
   private static final Logger c_logger = Logger.getAnonymousLogger();
-  private static int c_commandIndex = 1;
-  private static BufferedReader c_input;
   private static String c_inputFile;
+  private static String c_dialect;
 
   public static void main( final String[] args )
   {
@@ -93,139 +94,28 @@ public class Main
 
     c_shell.setDriver( driver );
 
-    if ( !isInteractive() )
+    final ObjectMapper mapper = new ObjectMapper();
+    try
     {
-      try
-      {
-        c_input = new BufferedReader( new InputStreamReader( new FileInputStream( c_inputFile ) ) );
-      }
-      catch ( FileNotFoundException e )
-      {
-        c_logger.log( Level.SEVERE, "Error: Unable to load input file " + c_inputFile + " due to: " + e, e );
-        System.exit( ERROR_OTHER_EXIT_CODE );
-        return;
-      }
+      (new Runner(c_shell)).apply( mapper.readValue( new File(c_inputFile) , ServerConfig.class ) );
     }
-    else
+    catch ( final IOException e )
     {
-      c_input = new BufferedReader( new InputStreamReader( System.in ) );
+      c_logger.log( Level.SEVERE, "Error: Unable to load input file " + c_inputFile + " due to: " + e, e );
+      System.exit( ERROR_OTHER_EXIT_CODE );
+      return;
     }
-    String command;
-    if ( isInteractive() )
+    catch ( final Exception e )
     {
-      printPrompt();
-    }
-    while ( null != ( command = readCommand() ) && !command.trim().equalsIgnoreCase( "quit" ) )
-    {
-      if ( command.trim().length() > 0 )
-      {
-        //Add new line after entered value
-        if ( isInteractive() )
-        {
-          System.out.println();
-        }
-        executeSQL( command );
-        if ( isInteractive() )
-        {
-          printPrompt();
-        }
-      }
+      c_logger.log( Level.SEVERE, "Error: Unable to apply changes to database from file " + c_inputFile + " due to: " + e, e );
+      e.printStackTrace();
+      System.exit( ERROR_OTHER_EXIT_CODE );
+      return;
     }
 
     if ( c_logger.isLoggable( Level.FINE ) )
     {
       c_logger.log( Level.FINE, "SqlShell completed." );
-    }
-  }
-
-  private static boolean isInteractive()
-  {
-    return null == c_inputFile;
-  }
-
-  private static String readCommand()
-  {
-    try
-    {
-      final StringBuilder sb = new StringBuilder();
-      String line;
-      boolean readLine = false;
-      while ( null != ( line = c_input.readLine() ) && !"GO".equals( line ) )
-      {
-        readLine = true;
-        sb.append( line );
-        sb.append( "\n" );
-      }
-      if ( !readLine )
-      {
-        return null;
-      }
-      else
-      {
-        return sb.toString().trim();
-      }
-    }
-    catch ( final IOException e )
-    {
-      c_logger.log( Level.SEVERE, "Error: Error reading input due to: " + e, e );
-      System.exit( ERROR_OTHER_EXIT_CODE );
-      return null;
-    }
-  }
-
-  private static void printPrompt()
-  {
-    System.out.print( c_commandIndex++ + "> " );
-  }
-
-  private static void executeSQL( final String command )
-  {
-    if ( c_logger.isLoggable( Level.FINE ) )
-    {
-      c_logger.log( Level.FINE, "Executing: " + command );
-    }
-    final Result result;
-    try
-    {
-      result = c_shell.execute( command );
-    }
-    catch ( final Throwable t )
-    {
-      c_logger.log( Level.SEVERE, "Error: Error executing sql due to " + t, t );
-      return;
-    }
-    if ( c_logger.isLoggable( Level.FINE ) )
-    {
-      if ( result.isQuery() )
-      {
-        c_logger.log( Level.FINE, "Result Row Count: " + result.getRows().size() );
-      }
-      else
-      {
-        c_logger.log( Level.FINE, "Result Update Count: " + result.getUpdateCount() );
-      }
-    }
-    if ( result.isQuery() )
-    {
-      final JSONArray jsonArray = new JSONArray();
-      for ( Map<String, Object> row : result.getRows() )
-      {
-        jsonArray.put( new JSONObject( row ) );
-      }
-      c_logger.log( Level.INFO, jsonArray.toString() );
-    }
-    else
-    {
-      try
-      {
-        final JSONObject jsonObject = new JSONObject();
-        jsonObject.put( "update_count", result.getUpdateCount() );
-        c_logger.log( Level.INFO, jsonObject.toString() );
-      }
-      catch ( final JSONException t )
-      {
-        c_logger.log( Level.SEVERE, "Error: Error formatting results due to " + t, t );
-      }
     }
   }
 
@@ -256,10 +146,11 @@ public class Main
     // Parse the arguments
     final CLArgsParser parser = new CLArgsParser( args, OPTIONS );
 
-    //Make sure that there was no errors parsing arguments
+    // Make sure that there was no errors parsing arguments
     if ( null != parser.getErrorString() )
     {
       c_logger.log( Level.SEVERE, "Error: " + parser.getErrorString() );
+      printUsage();
       return false;
     }
 
@@ -292,9 +183,20 @@ public class Main
           c_databaseDriver = option.getArgument();
           break;
         }
-        case SQL_FILE_OPT:
+        case FILE_OPT:
         {
           c_inputFile = option.getArgument();
+          break;
+        }
+        case DATABASE_DIALECT_OPT:
+        {
+          c_dialect = option.getArgument();
+          if ( !"mssql".equals( c_dialect ) )
+          {
+            c_logger.log( Level.SEVERE, "Unsupported database dialect: " + c_dialect );
+            c_logger.log( Level.SEVERE, "Supported database dialects are: mssql" );
+            return false;
+          }
           break;
         }
         case VERBOSE_OPT:
@@ -312,7 +214,6 @@ public class Main
           printUsage();
           return false;
         }
-
       }
     }
     if ( null == c_databaseDriver )
@@ -323,6 +224,16 @@ public class Main
     if ( null == c_shell.getDatabase() )
     {
       c_logger.log( Level.SEVERE, "Error: Jdbc url must supplied for the database" );
+      return false;
+    }
+    if ( null == c_dialect )
+    {
+      c_logger.log( Level.SEVERE, "Error: Database dialect must specified" );
+      return false;
+    }
+    if ( null == c_inputFile )
+    {
+      c_logger.log( Level.SEVERE, "Error: Input JSON file must specified" );
       return false;
     }
     if ( c_logger.isLoggable( Level.FINE ) )
@@ -346,17 +257,12 @@ public class Main
   {
     final String lineSeparator = System.getProperty( "line.separator" );
 
-    final StringBuilder msg = new StringBuilder();
-
-    msg.append( "java " );
-    msg.append( Main.class.getName() );
-    msg.append( " [options] jdbcURL" );
-    msg.append( lineSeparator );
-    msg.append( "Options: " );
-    msg.append( lineSeparator );
-
-    msg.append( CLUtil.describeOptions( OPTIONS ).toString() );
-
-    c_logger.log( Level.INFO, msg.toString() );
+    c_logger.log( Level.INFO, "java " +
+                              ConfigLoader.class.getName() +
+                              " [options] jdbcURL" +
+                              lineSeparator +
+                              "Options: " +
+                              lineSeparator +
+                              CLUtil.describeOptions( OPTIONS ).toString() );
   }
 }
