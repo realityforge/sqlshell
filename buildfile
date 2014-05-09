@@ -1,4 +1,5 @@
 require 'buildr/git_auto_version'
+require 'buildr/gpg'
 
 COMPILE_DEPS = [:getopt4j, :json, :javax_jsr305, :jackson_core, :jackson_mapper, :jackson_json]
 TEST_DEPS = [:jtds, :postgresql, :mockito]
