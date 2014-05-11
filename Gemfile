@@ -1,4 +1,5 @@
 ruby '1.9.3'
 
-source :rubygems
-gem 'buildr', '= 1.4.15'
+source 'https://rubygems.org'
+
+gem 'buildr', '= 1.4.16'
