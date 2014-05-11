@@ -10,7 +10,7 @@ define 'sqlshell' do
   compile.options.target = '1.6'
   compile.options.lint = 'all'
 
-  pom.add_apache2_license
+  pom.add_apache_v2_license
   pom.add_github_project('realityforge/sqlshell')
   pom.add_developer('realityforge', 'Peter Donald', 'peter@realityforge.org', ['Developer'])
 
