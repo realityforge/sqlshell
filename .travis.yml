@@ -12,3 +12,5 @@ install:
 env:
   - TEST_PG_DB_USER=postgres
 script: buildr clean package
+git:
+  depth: 10
