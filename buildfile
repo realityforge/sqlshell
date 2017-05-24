@@ -6,8 +6,8 @@ TEST_DEPS = [:jtds, :postgresql]
 desc 'sqlshell: Command line shell to interact with a database'
 define 'sqlshell' do
   project.group = 'org.realityforge.sqlshell'
-  compile.options.source = '1.6'
-  compile.options.target = '1.6'
+  compile.options.source = '1.8'
+  compile.options.target = '1.8'
   compile.options.lint = 'all'
 
   pom.add_apache_v2_license
