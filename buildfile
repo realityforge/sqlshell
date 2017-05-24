@@ -1,5 +1,4 @@
 require 'buildr/git_auto_version'
-require 'buildr/custom_pom'
 
 COMPILE_DEPS = [:getopt4j, :json]
 TEST_DEPS = [:jtds, :postgresql]
