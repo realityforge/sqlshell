@@ -3,7 +3,7 @@ repositories:
    - https://repo.maven.apache.org/maven2
 
 artifacts:
-  getopt4j: org.realityforge.getopt4j:getopt4j:jar:1.2
+  getopt4j: org.realityforge.getopt4j:getopt4j:jar:0.3
   postgresql: postgresql:postgresql:jar:9.1-901.jdbc4
   jtds: net.sourceforge.jtds:jtds:jar:1.2.7
   json: org.json:json:jar:20090211
