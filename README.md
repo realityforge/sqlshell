@@ -1,7 +1,7 @@
 SqlShell - JDBC based SQL Shell
 ===============================
 
-[![Build Status](https://secure.travis-ci.org/realityforge/sqlshell.svg?branch=master)](http://travis-ci.org/realityforge/sqlshell)
+[![Build Status](https://api.travis-ci.com/realityforge/sqlshell.svg?branch=master)](http://travis-ci.org/realityforge/sqlshell)
 
 What is SqlShell ?
 ------------------
